@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PolyArb Scanner</title>
+  <meta name="description" content="Сканер вилок между Polymarket и букмекерами">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%2310b981'/><path d='M8 22l6-8 4 5 6-9' stroke='white' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><span class="logo"></span>PolyArb <small>Polymarket ↔ букмекеры</small></div>
+  <div class="actions">
+    <span id="status" class="status">Готов</span>
+    <button id="demoBtn" class="ghost">Демо</button>
+    <button id="scanBtn">Сканировать</button>
+  </div>
+</header>
+
+<main>
+  <section class="stats">
+    <div class="stat"><span>Вилок</span><b id="statArbs">0</b></div>
+    <div class="stat"><span>Лучшая</span><b id="statBest">—</b></div>
+    <div class="stat"><span>Сопоставлено матчей</span><b id="statMatched">0</b></div>
+    <div class="stat"><span>Кредитов Odds API</span><b id="statCredits">—</b></div>
+  </section>
+
+  <div class="layout">
+    <aside>
+      <form id="settingsForm" onsubmit="return false">
+        <h3>Виды спорта</h3>
+        <div id="sports" class="chips"></div>
+
+        <h3>Букмекеры</h3>
+        <label>Ключ The Odds API <input id="oddsApiKey" type="password" placeholder="бесплатно на the-odds-api.com" autocomplete="off"></label>
+        <label>Регионы <input id="regions" placeholder="eu,uk,us,au"></label>
+        <label>Только эти буки (ключи через запятую) <input id="bookmakers" placeholder="pinnacle,betfair_ex_eu,marathonbet"></label>
+
+        <h3>Фильтры</h3>
+        <div class="grid2">
+          <label>Мин. профит, % <input id="minProfit" type="number" step="0.1"></label>
+          <label>Мин. лимит, $ <input id="minLiquidity" type="number" step="10" min="0"></label>
+          <label>Комиссия PM, % <input id="polyFee" type="number" step="0.1" min="0"></label>
+          <label>Комиссия бирж, % <input id="exchangeCommission" type="number" step="0.1" min="0"></label>
+          <label>Банк, $ <input id="bankroll" type="number" step="10" min="0"></label>
+          <label>Автообновление, сек <input id="refreshSec" type="number" step="15" min="0" title="0 = вручную, минимум 15"></label>
+        </div>
+        <label class="check"><input id="useOrderBook" type="checkbox"> Уточнять по стакану Polymarket (CLOB)</label>
+        <label class="check"><input id="includeBookOnly" type="checkbox"> Показывать вилки бук ↔ бук</label>
+
+        <h3>Уведомления</h3>
+        <label>Telegram bot token <input id="tgToken" type="password" autocomplete="off" placeholder="123456:ABC…"></label>
+        <label>Telegram chat id <input id="tgChat" placeholder="123456789"></label>
+        <div class="row"><button type="button" id="tgTest" class="ghost small">Тест</button><button type="button" id="clearAlerts" class="ghost small">Сбросить историю</button></div>
+        <label class="check"><input id="browserNotify" type="checkbox"> Уведомления браузера</label>
+
+        <details>
+          <summary>Дополнительно</summary>
+          <div class="grid2">
+            <label>Окно по времени, ч <input id="timeTolerance" type="number" step="1" min="0"></label>
+            <label>Порог совпадения <input id="matchThreshold" type="number" step="0.02" min="0" max="1"></label>
+          </div>
+          <label>CORS-прокси (если API блокирует браузер) <input id="corsProxy" placeholder="https://corsproxy.io/?url={url}"></label>
+          <label>Свой список видов спорта (JSON) <textarea id="sportsOverride" rows="5" placeholder='[{"id":"nba","label":"NBA","poly":"nba","odds":"basketball_nba","outcomes":2}]'></textarea></label>
+          <button type="button" id="resetSports" class="ghost small">Вставить стандартный список</button>
+        </details>
+        <p class="note">Ключи хранятся только в вашем браузере (localStorage) и уходят напрямую в API.</p>
+      </form>
+    </aside>
+
+    <section class="content">
+      <nav class="tabs">
+        <button class="tab active" data-panel="pArbs">Вилки <span id="tabArbsCount" class="badge">0</span></button>
+        <button class="tab" data-panel="pMatches">Сопоставленные <span id="tabMatchCount" class="badge">0</span></button>
+        <button class="tab" data-panel="pUnmatched">Без пары <span id="tabUnmatchedCount" class="badge">0</span></button>
+        <button class="tab" data-panel="pLog">Лог</button>
+      </nav>
+
+      <div id="pArbs" class="panel">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Профит</th><th>Событие</th><th>Начало</th><th>Ноги</th><th>Лимит</th><th></th></tr></thead>
+          <tbody id="arbBody"></tbody>
+        </table></div>
+      </div>
+      <div id="pMatches" class="panel hidden">
+        <div class="table-wrap"><table>
+          <thead><tr><th>Событие</th><th>Начало</th><th>Polymarket vs лучший бук</th><th>Буков</th><th>Итог</th></tr></thead>
+          <tbody id="matchBody"></tbody>
+        </table></div>
+      </div>
+      <div id="pUnmatched" class="panel hidden">
+        <p class="note">Матчи Polymarket, для которых не нашлась пара у букмекеров. Если пара очевидна — снизьте «Порог совпадения» или увеличьте окно по времени.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Событие</th><th>Спорт</th><th>Исходы</th></tr></thead>
+          <tbody id="unmatchedBody"></tbody>
+        </table></div>
+      </div>
+      <div id="pLog" class="panel hidden"><div id="log" class="log"></div></div>
+
+      <details class="help">
+        <summary>Как это считается</summary>
+        <p>Для каждого исхода берётся «стоимость $1 выплаты»: на Polymarket это цена ask (с комиссией), у букмекера — 1 / коэффициент.
+        Вилка — набор ставок, покрывающий все исходы, где сумма стоимостей &lt; 1. Профит = 1 / сумма − 1.
+        Для футбола (1X2) кроме YES учитываются NO-позиции Polymarket («не победа» = ничья или победа соперника).</p>
+        <p>Перед ставкой всегда проверяйте: правила расчёта (овертайм, отмена матча), актуальность коэффициента у бука, лимиты аккаунта и проскальзывание.</p>
+      </details>
+    </section>
+  </div>
+</main>
+<script type="module" src="js/app.js"></script>
+</body>
+</html>
