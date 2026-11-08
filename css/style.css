@@ -139,8 +139,8 @@ select { background: var(--panel2); color: var(--text); border: 1px solid var(--
 .seg button:first-child { border-radius: 8px 0 0 8px; }
 .seg button:last-child { border-radius: 0 8px 8px 0; border-left: 0; }
 .seg button.active, button.ghost.active { background: rgba(16, 185, 129, .15); border-color: var(--accent); }
-body.no-aside .layout { grid-template-columns: 1fr; }
-body.no-aside aside { display: none; }
+body.aside-toggled .layout { grid-template-columns: 1fr; }
+body.aside-toggled aside { display: none; }
 
 .calc-panel { background: var(--panel); border: 1px solid var(--accent); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 16px; }
 .calc-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 10px; }
@@ -167,3 +167,34 @@ body.no-aside aside { display: none; }
   .jgrid { grid-template-columns: 1fr; }
 }
 :root[data-theme="light"] .profit.hot { color: #fff; }
+.m-only { display: none; }
+.age { font-size: 11px; color: var(--muted); }
+.age.old { color: var(--warn); }
+#diagText { font: 11px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+/* ---- phone: collapsible filters, arbs as cards ---- */
+@media (max-width: 960px) {
+  aside { display: none; order: 2; }
+  body.aside-toggled aside { display: block; }
+  body.aside-toggled .layout { grid-template-columns: 1fr; }
+}
+@media (max-width: 640px) {
+  .stats { gap: 8px; }
+  .stat { padding: 8px 12px; }
+  .stat b { font-size: 18px; }
+  #pArbs table, #pArbs tbody { display: block; }
+  #pArbs thead { display: none; }
+  #pArbs tr.arb-row { display: grid; grid-template-columns: auto 1fr; gap: 6px 12px; padding: 12px; border-bottom: 1px solid var(--line); }
+  #pArbs tr.arb-row td { display: block; padding: 0; border: 0; }
+  #pArbs td.c-profit { grid-row: span 2; }
+  #pArbs td.c-bets, #pArbs td.c-books, #pArbs td.c-limit, #pArbs td.actions-cell { grid-column: 1 / -1; }
+  #pArbs tr.arb-row td.c-bets { display: none; }
+  #pArbs .m-only { display: inline; }
+  #pArbs td.c-books .leg { white-space: normal; margin: 4px 0; }
+  #pArbs td.c-limit::before { content: 'Лимит: '; color: var(--muted); font-size: 12px; }
+  #pArbs td.actions-cell { display: flex; justify-content: flex-start; }
+  #pArbs td.empty { display: block; }
+  .calc-leg { grid-template-columns: 1fr; }
+  .calc-leg input, .calc-sum input { width: 100%; }
+  .toolbar input[type="search"] { min-width: 100%; }
+}

@@ -178,3 +178,43 @@ test('esports: arbs on demo data', () => {
   assert.equal(book.label, 'П2 (матч)'); // MOUZ at the bookmaker
   assert.equal(book.book, 'Winline');
 });
+
+import { isStale } from '../js/esports.js';
+import { OddsPapi } from '../js/oddspapi.js';
+
+test('stale bookmaker prices are skipped only when the filter is on', () => {
+  const now = Date.parse('2026-11-08T12:00:00Z');
+  assert.equal(isStale('2026-11-08T11:00:00Z', 0, now), false);
+  assert.equal(isStale('2026-11-08T11:00:00Z', 30, now), true);
+  assert.equal(isStale('2026-11-08T11:45:00Z', 30, now), false);
+  assert.equal(isStale(null, 30, now), false);
+});
+
+test('oddspapi diagnose: tolerant to wrappers, never leaks the key', async () => {
+  const d = demoEsports();
+  const key = 'SECRET123';
+  const realFetch = globalThis.fetch;
+  const calls = [];
+  globalThis.fetch = async url => {
+    calls.push(url);
+    const path = new URL(url).pathname.replace('/v4/', '');
+    const body = {
+      account: { request_count: 5, request_limit: 250 },
+      bookmakers: [{ slug: 'pinnacle' }, { slug: 'winline' }],
+      markets: { data: Object.entries(d.markets).map(([id, m]) => ({ marketId: +id, sportId: 17, marketType: m.t, period: m.p, handicap: m.h, outcomes: m.o.map(([outcomeId, outcomeName]) => ({ outcomeId, outcomeName })) })) },
+      fixtures: [{ fixtureId: 'id17demo1', sportId: 17, statusId: 0, startTime: new Date(Date.now() + 3600e3).toISOString(), participant1Name: 'MOUZ', participant2Name: 'The MongolZ' }],
+      odds: [d.odds.id17demo1],
+    }[path];
+    return { ok: true, status: 200, json: async () => body };
+  };
+  try {
+    const p = new OddsPapi(key);
+    const report = await p.diagnose(17);
+    assert.ok(report.includes('bookmakers (2)'));
+    assert.ok(report.includes('markets for sport: 7'));
+    assert.ok(report.includes('spreads|result|-1.5'));
+    assert.ok(report.includes('"home/-1.5"'));
+    assert.ok(!report.includes(key));
+    assert.ok(calls.every(u => u.includes('apiKey=' + key)));
+  } finally { globalThis.fetch = realFetch; }
+});

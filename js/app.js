@@ -47,7 +47,7 @@ function log(msg, level = 'info') {
 
 /* ---------------- settings form ---------------- */
 const FIELDS = ['oddsApiKey', 'regions', 'bookmakers', 'oddspapiKey', 'oddspapiBooks', 'oddspapiMaxFixtures', 'scanHours',
-  'minProfit', 'maxProfit', 'minOdds', 'maxOdds', 'minLiquidity', 'polyFee', 'exchangeCommission', 'bankroll', 'roundTo', 'rubRate',
+  'minProfit', 'maxProfit', 'minOdds', 'maxOdds', 'maxQuoteAgeMin', 'minLiquidity', 'polyFee', 'exchangeCommission', 'bankroll', 'roundTo', 'rubRate',
   'timeTolerance', 'matchThreshold', 'refreshSec', 'includeBookOnly', 'useOrderBook', 'corsProxy',
   'tgToken', 'tgChat', 'browserNotify', 'sportsOverride', 'search'];
 
@@ -290,10 +290,20 @@ async function alertNew(arbs) {
       a.legs.map(l => `• ${esc(l.book)} — ${esc(l.label)}${l.team && l.team !== l.label ? ' ' + esc(l.team) : ''} @ ${fmtPrice(l)}`).join('\n') +
       (a.maxBankroll ? `\nЛимит ≈ $${Math.round(a.maxBankroll)}` : '') + `\n${a.match.url}`;
     if (S.tgToken && S.tgChat) sendTelegram(S.tgToken, S.tgChat, text).catch(e => log('Telegram: ' + e.message, 'error'));
-    if (S.browserNotify && 'Notification' in window && Notification.permission === 'granted') {
-      new Notification(`Вилка ${a.profitPct.toFixed(2)}%`, { body: a.match.title });
-    }
+    if (S.browserNotify) notify(`Вилка ${a.profitPct.toFixed(2)}% · ${sportLabel(a.match.sport)}`,
+      `${a.match.title}\n${a.legs.map(l => `${l.book}: ${l.label} @ ${fmtPrice(l)}`).join('\n')}`, a.match.url, arbKey(a));
   }
+}
+
+/** Device notification. Through the service worker when there is one (needed on Android / installed iOS app). */
+async function notify(title, body, url, tag) {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return false;
+  const opts = { body, tag, icon: 'icons/icon-192.png', badge: 'icons/icon-192.png', data: { url } };
+  try {
+    const reg = 'serviceWorker' in navigator && await navigator.serviceWorker.getRegistration();
+    if (reg) { await reg.showNotification(title, opts); return true; }
+  } catch {}
+  try { new Notification(title, opts); return true; } catch { return false; }
 }
 
 function beep() {
@@ -316,6 +326,14 @@ function ago(t) {
   if (s < 60) return 'только что';
   if (s < 3600) return `${Math.floor(s / 60)} мин`;
   return `${Math.floor(s / 3600)} ч ${Math.floor((s % 3600) / 60)} мин`;
+}
+
+function freshness(l) {
+  if (l.src !== 'book' || !l.updated) return '';
+  const t = new Date(l.updated).getTime();
+  if (!isFinite(t)) return '';
+  const min = (Date.now() - t) / 60e3;
+  return ` <span class="age ${min > 30 ? 'old' : ''}" title="Коэффициент у букмекера последний раз менялся ${new Date(t).toLocaleTimeString()}">${min < 1 ? 'сейчас' : ago(t)}</span>`;
 }
 
 /* ---------------- rendering ---------------- */
@@ -345,13 +363,13 @@ function renderArbs(arbs) {
     const tr = document.createElement('tr');
     tr.className = 'arb-row' + (calc?.arb === a ? ' selected' : '');
     tr.innerHTML = `
-      <td class="nowrap"><span class="profit ${a.profitPct >= 2 ? 'hot' : ''} ${suspicious ? 'sus' : ''}" title="${suspicious ? 'Подозрительно высокий профит — проверьте линию и сопоставление' : ''}">${a.profitPct.toFixed(2)}%</span>
+      <td class="nowrap c-profit"><span class="profit ${a.profitPct >= 2 ? 'hot' : ''} ${suspicious ? 'sus' : ''}" title="${suspicious ? 'Подозрительно высокий профит — проверьте линию и сопоставление' : ''}">${a.profitPct.toFixed(2)}%</span>
         <div class="sub">${a.firstSeen ? ago(a.firstSeen) : ''}</div></td>
-      <td><div class="ev">${esc(m.title)}</div><div class="sub">${esc(sportLabel(m.sport))} · ${fmtTime(m.start)}</div>
+      <td class="c-event"><div class="ev">${esc(m.title)}</div><div class="sub">${esc(sportLabel(m.sport))} · ${fmtTime(m.start)}</div>
         <div class="sub dim">${esc(m.other)} · совпадение ${(m.score * 100).toFixed(0)}%</div></td>
-      <td>${a.legs.map(l => `<div class="leg"><span class="lbl">${esc(l.label)}</span>${l.team && l.team !== l.label ? ` <span class="sub">${esc(l.team)}</span>` : ''}</div>`).join('')}</td>
-      <td>${a.legs.map(l => `<div class="leg"><span class="src ${l.src}">${esc(l.book)}</span> <b>${fmtPrice(l)}</b>${l.limit ? ` <span class="sub">лим ${Math.round(l.limit)}</span>` : ''}</div>`).join('')}</td>
-      <td class="nowrap">${a.maxBankroll != null ? money(a.maxBankroll) : '—'}</td>
+      <td class="c-bets" data-label="Ставки">${a.legs.map(l => `<div class="leg"><span class="lbl">${esc(l.label)}</span>${l.team && l.team !== l.label ? ` <span class="sub">${esc(l.team)}</span>` : ''}</div>`).join('')}</td>
+      <td class="c-books" data-label="Где">${a.legs.map(l => `<div class="leg"><span class="src ${l.src}">${esc(l.book)}</span> <span class="m-only lbl">${esc(l.label)}${l.team && l.team !== l.label ? ' ' + esc(l.team) : ''}</span> <b>${fmtPrice(l)}</b>${l.limit ? ` <span class="sub">лим ${Math.round(l.limit)}</span>` : ''}${freshness(l)}</div>`).join('')}</td>
+      <td class="nowrap c-limit" data-label="Лимит">${a.maxBankroll != null ? money(a.maxBankroll) : '—'}</td>
       <td class="nowrap actions-cell">
         <a class="ghost small btn" href="${m.url}" target="_blank" rel="noopener" title="Открыть на Polymarket">Poly</a>
         ${a.legs.filter(l => l.src === 'book' && l.url).slice(0, 1).map(l => `<a class="ghost small btn" href="${esc(l.url)}" target="_blank" rel="noopener" title="Открыть у букмекера">БК</a>`).join('')}
@@ -498,14 +516,36 @@ document.addEventListener('DOMContentLoaded', () => {
   $('#search').addEventListener('input', () => { readForm(); save(); render(); });
   $$('[data-sort]').forEach(b => b.addEventListener('click', () => { S.sortBy = b.dataset.sort; save(); setSortButtons(); render(); }));
   $('#themeBtn').addEventListener('click', () => { S.theme = S.theme === 'light' ? 'dark' : 'light'; save(); applyTheme(); });
-  $('#filtersBtn').addEventListener('click', () => document.body.classList.toggle('no-aside'));
+  $('#filtersBtn').addEventListener('click', () => {
+    document.body.classList.toggle('aside-toggled');
+    if (document.body.classList.contains('aside-toggled') && matchMedia('(max-width: 960px)').matches) $('aside').scrollIntoView({ behavior: 'smooth' });
+  });
   $('#showHidden').addEventListener('click', () => { hidden.clear(); store.set(HIDDEN, []); render(); log('Скрытые события возвращены'); });
   $('#sportsOverride').addEventListener('change', renderSportChips);
   $('#resetSports').addEventListener('click', () => {
     $('#sportsOverride').value = JSON.stringify(DEFAULT_SPORTS, null, 1); readForm(); save(); renderSportChips();
   });
-  $('#browserNotify').addEventListener('change', e => {
-    if (e.target.checked && 'Notification' in window) Notification.requestPermission();
+  $('#browserNotify').addEventListener('change', async e => {
+    if (!e.target.checked) return;
+    if (!('Notification' in window)) { log('Этот браузер не умеет уведомления. На iPhone — установите сайт на экран «Домой».', 'warn'); return; }
+    const r = await Notification.requestPermission();
+    if (r !== 'granted') { log('Уведомления запрещены в настройках браузера', 'warn'); e.target.checked = false; readForm(); save(); }
+  });
+  $('#notifyTest').addEventListener('click', async () => {
+    if ('Notification' in window && Notification.permission === 'default') await Notification.requestPermission();
+    const ok = await notify('PolyArb · тест', 'Так будут выглядеть уведомления о вилках', null, 'test');
+    log(ok ? 'Тестовое уведомление отправлено' : 'Уведомления недоступны: разрешите их в браузере (на iPhone — только из установленного приложения)', ok ? 'ok' : 'warn');
+  });
+
+  // installable app
+  if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+    navigator.serviceWorker.register('sw.js').catch(e => log('Service worker: ' + e.message, 'warn'));
+  }
+  let installEvt = null;
+  window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; $('#installBtn').classList.remove('hidden'); });
+  $('#installBtn').addEventListener('click', async () => {
+    if (!installEvt) return;
+    installEvt.prompt(); await installEvt.userChoice; installEvt = null; $('#installBtn').classList.add('hidden');
   });
   $('#tgTest').addEventListener('click', async () => {
     readForm();
@@ -524,6 +564,22 @@ document.addEventListener('DOMContentLoaded', () => {
       const books = await p.bookmakers();
       log(`OddsPapi: доступно букмекеров — ${books.length}: ${books.slice(0, 40).map(b => b.slug).join(', ')}${books.length > 40 ? '…' : ''}`);
     } catch (e) { log(e.message, 'error'); }
+  });
+  $('#papiDiag').addEventListener('click', async () => {
+    readForm(); save();
+    if (!S.oddspapiKey) return log('Вставьте ключ OddsPapi', 'warn');
+    const sp = sports().find(x => x.kind === 'esports' && S.sports.includes(x.id)) || sports().find(x => x.kind === 'esports');
+    $('#diagBox').classList.remove('hidden');
+    $('#diagText').value = `Собираю отчёт по ${sp.label}…`;
+    try {
+      const p = new OddsPapi(S.oddspapiKey, { proxy: S.corsProxy });
+      $('#diagText').value = (await p.diagnose(sp.papi)).split(S.oddspapiKey).join('***');
+    } catch (e) { $('#diagText').value = 'Ошибка: ' + e.message.split(S.oddspapiKey).join('***'); }
+  });
+  $('#diagCopy').addEventListener('click', async () => {
+    const t = $('#diagText');
+    try { await navigator.clipboard.writeText(t.value); log('Отчёт скопирован', 'ok'); }
+    catch { t.select(); document.execCommand('copy'); log('Отчёт скопирован', 'ok'); }
   });
   $('#clearAlerts').addEventListener('click', () => { alerted.clear(); store.set(SEEN, []); log('История уведомлений очищена'); });
   $$('.tab').forEach(t => t.addEventListener('click', () => {

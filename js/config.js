@@ -40,6 +40,7 @@ export const DEFAULT_SETTINGS = {
   sports: ['cs2', 'dota2', 'lol', 'val', 'nba', 'epl'],
   minOdds: 1.01,
   maxOdds: 100,
+  maxQuoteAgeMin: 0,         // skip bookmaker prices not updated for this many minutes (0 = off)
   maxProfit: 25,             // above this an arb is almost always a matching / line error — flagged
   search: '',
   sortBy: 'profit',          // profit | time

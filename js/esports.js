@@ -123,7 +123,7 @@ export function oddsPapiLines(odds, marketsMap, swap, s = {}) {
         if (!p) return;
         entry.quotes[i].push({
           src: 'book', book: prettyBook(book), bookKey: book, price: p.price, q: bookCost(p.price, comm),
-          limit: num(p.limit), updated: p.changedAt, url: bo.fixturePath || null,
+          limit: num(p.limit), updated: p.bookmakerChangedAt || p.changedAt, url: bo.fixturePath || null,
         });
       });
     }
@@ -153,6 +153,13 @@ export function outcomeLabel(type, line, i) {
   return i === 0 ? `ТБ(${line})` : `ТМ(${line})`;
 }
 
+/** A bookmaker price older than maxAgeMin minutes is skipped (0 = keep everything). */
+export function isStale(updated, maxAgeMin, now = Date.now()) {
+  if (!maxAgeMin || !updated) return false;
+  const t = new Date(updated).getTime();
+  return isFinite(t) && now - t > maxAgeMin * 60e3;
+}
+
 /** Compare one Polymarket game with one OddsPapi fixture's odds. */
 export function esportsArbs(game, lines, s) {
   const out = [], compared = [];
@@ -167,6 +174,7 @@ export function esportsArbs(game, lines, s) {
       });
       for (const b of line.quotes[i]) {
         if (b.price < (s.minOdds || 1) || b.price > (s.maxOdds || 1e9)) continue;
+        if (isStale(b.updated, s.maxQuoteAgeMin)) continue;
         quotes.push({ ...b, set: [i], side: 'BACK' });
       }
     });

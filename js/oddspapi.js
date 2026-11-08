@@ -3,6 +3,8 @@
 import { withProxy, parseDate } from './sources.js';
 
 const BASE = 'https://api.oddspapi.io/v4';
+// Responses are documented as bare arrays/objects; tolerate a { data } wrapper too.
+const unwrap = d => (Array.isArray(d) ? d : d && typeof d === 'object' && 'data' in d ? d.data : d);
 const COOLDOWN = { fixtures: 2000, odds: 500, markets: 1000, bookmakers: 1000, account: 1000 };
 const last = {};
 const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -48,7 +50,7 @@ export class OddsPapi {
   async bookmakers() {
     const k = 'polyarb.papi.bookmakers';
     let d = cache.get(k, 24 * 3600e3);
-    if (!d) { d = await this.get('bookmakers'); cache.set(k, d); }
+    if (!d) { d = unwrap(await this.get('bookmakers')) || []; cache.set(k, d); }
     return d;
   }
 
@@ -60,7 +62,7 @@ export class OddsPapi {
       const all = await this.get('markets');
       const keep = new Set(sportIds);
       const map = {};
-      for (const m of all || []) {
+      for (const m of unwrap(all) || []) {
         if (!keep.has(m.sportId) || m.playerProp) continue;
         if (!['moneyline', 'spreads', 'totals'].includes(m.marketType)) continue;
         map[m.marketId] = { t: m.marketType, p: m.period, h: m.handicap, o: (m.outcomes || []).map(x => [x.outcomeId, x.outcomeName]) };
@@ -74,8 +76,8 @@ export class OddsPapi {
   async fixtures(sportId, hoursAhead = 48) {
     const from = new Date(Date.now() - 3 * 3600e3).toISOString().slice(0, 19) + 'Z';
     const to = new Date(Date.now() + Math.min(hoursAhead, 239) * 3600e3).toISOString().slice(0, 19) + 'Z';
-    const list = await this.get('fixtures', { sportId, from, to, hasOdds: 'true' });
-    return (list || []).filter(f => f.statusId === 0 || f.statusId === 1).map(f => ({
+    const list = unwrap(await this.get('fixtures', { sportId, from, to, hasOdds: 'true' }));
+    return (Array.isArray(list) ? list : []).filter(f => f.statusId === 0 || f.statusId === 1).map(f => ({
       id: f.fixtureId, sportId: f.sportId, start: parseDate(f.startTime), live: f.statusId === 1,
       tournament: f.tournamentName, names: [
         [f.participant1Name, f.participant1ShortName, f.participant1Abbr].filter(Boolean),
@@ -85,9 +87,54 @@ export class OddsPapi {
     }));
   }
 
-  odds(fixtureId, bookmakers = '') {
+  async odds(fixtureId, bookmakers = '') {
     const p = { fixtureId, oddsFormat: 'decimal', verbosity: 3 };
     if (bookmakers) p.bookmakers = bookmakers.replace(/\s+/g, '');
-    return this.get('odds', p);
+    const r = unwrap(await this.get('odds', p));
+    return Array.isArray(r) ? r[0] : r;
+  }
+
+  /**
+   * Short plain-text report about the real response shapes (no key inside), for checking the parser:
+   * account quota, bookmakers, one fixture and, per market type, what the books send.
+   */
+  async diagnose(sportId) {
+    const lines = [`OddsPapi diagnose · sportId ${sportId} · ${new Date().toISOString()}`];
+    const short = v => JSON.stringify(v)?.slice(0, 300);
+    try { lines.push('account: ' + short(await this.account())); } catch (e) { lines.push('account ERROR ' + e.message); }
+    let books = [];
+    try { books = await this.bookmakers(); lines.push(`bookmakers (${books.length}): ` + books.map(b => b.slug).join(',').slice(0, 1500)); }
+    catch (e) { lines.push('bookmakers ERROR ' + e.message); }
+    let map = {};
+    try { map = await this.markets([sportId]); lines.push(`markets for sport: ${Object.keys(map).length}`); }
+    catch (e) { lines.push('markets ERROR ' + e.message); }
+    let fx = [];
+    try { fx = await this.fixtures(sportId, 48); lines.push(`fixtures 48h: ${fx.length}` + (fx[0] ? ` · first: ${fx[0].id} ${fx[0].title} ${fx[0].start?.toISOString()}` : '')); }
+    catch (e) { lines.push('fixtures ERROR ' + e.message); }
+    if (!fx.length) return lines.join('\n');
+    let odds;
+    try { odds = await this.odds(fx[0].id); }
+    catch (e) { lines.push('odds ERROR ' + e.message); return lines.join('\n'); }
+    lines.push('odds top-level keys: ' + Object.keys(odds || {}).join(','));
+    const bo = odds?.bookmakerOdds || {};
+    lines.push(`books in odds: ${Object.keys(bo).join(',')}`);
+    const seen = new Set();
+    for (const [book, b] of Object.entries(bo)) {
+      lines.push(`[${book}] keys: ${Object.keys(b).join(',')} · suspended=${b.suspended} · markets=${Object.keys(b.markets || {}).length}`);
+      for (const [mid, mk] of Object.entries(b.markets || {})) {
+        const def = map[mid];
+        const kind = def ? `${def.t}|${def.p}|${def.h}` : 'unknown';
+        if (seen.has(book + kind.split('|').slice(0, 2).join('|')) && def?.t !== 'spreads') continue;
+        seen.add(book + kind.split('|').slice(0, 2).join('|'));
+        const outs = Object.entries(mk.outcomes || {}).map(([oid, o]) => {
+          const pl = o.players?.['0'] || Object.values(o.players || {})[0] || {};
+          const name = def?.o.find(x => String(x[0]) === oid)?.[1];
+          return `${oid}${name ? '=' + name : ''}:${pl.price}@"${pl.bookmakerOutcomeId}"${pl.limit != null ? ' lim' + pl.limit : ''}${pl.changedAt ? ' ch ' + String(pl.changedAt).slice(11, 19) : ''}`;
+        });
+        lines.push(`   m${mid} ${kind} active=${mk.marketActive} · ${outs.join(' | ')}`);
+        if (lines.length > 160) { lines.push('…'); return lines.join('\n'); }
+      }
+    }
+    return lines.join('\n');
   }
 }

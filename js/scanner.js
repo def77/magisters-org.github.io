@@ -2,6 +2,7 @@
 import { findMatch } from './match.js';
 import { findArbs, bestBook, polyCost, bookCost, bookDepth, maxBankrollFromLeg } from './arb.js';
 import { EXCHANGE_KEYS } from './config.js';
+import { isStale } from './esports.js';
 
 export function buildQuotes(poly, odds, bookNames, s) {
   const n = poly.outcomes.length;
@@ -20,6 +21,7 @@ export function buildQuotes(poly, odds, bookNames, s) {
   });
   for (const b of odds.books) {
     if (whitelist && !whitelist.has(b.key)) continue;
+    if (isStale(b.updated, s.maxQuoteAgeMin)) continue;
     const comm = EXCHANGE_KEYS.test(b.key) ? s.exchangeCommission : 0;
     bookNames.forEach((name, i) => {
       const o = b.prices[name];
