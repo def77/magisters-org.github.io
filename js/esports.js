@@ -190,3 +190,39 @@ export function esportsArbs(game, lines, s) {
   }
   return { arbs: out, compared };
 }
+
+/**
+ * Every line of a match (bookmaker lines from OddsPapi plus Polymarket markets) as
+ * { key, type, period, line, quotes:[[outcome0...], [outcome1...]] } with labels — input for value bets and middles.
+ */
+export function lineEntries(game, lines, s = {}) {
+  const map = new Map();
+  const entry = key => {
+    if (!map.has(key)) {
+      const [type, period, line] = key.split('|');
+      map.set(key, { key, type, period, line: +line, quotes: [[], []] });
+    }
+    return map.get(key);
+  };
+  for (const [key, l] of lines) {
+    const e = entry(key);
+    l.quotes.forEach((list, i) => list.forEach(b => {
+      if (b.price < (s.minOdds || 1) || b.price > (s.maxOdds || 1e9) || isStale(b.updated, s.maxQuoteAgeMin)) return;
+      e.quotes[i].push({ ...b, set: [i], side: 'BACK' });
+    }));
+  }
+  for (const m of game.markets) {
+    const e = entry(m.key);
+    m.legs.forEach((l, i) => {
+      if (l.ask > 0 && l.ask < 1) e.quotes[i].push({
+        set: [i], src: 'poly', book: 'Polymarket', bookKey: 'polymarket', side: 'YES', price: l.ask, token: l.token, fee: l.fee,
+        q: polyCost(l.ask, s.polyFee, l.fee), url: game.url,
+      });
+    });
+  }
+  for (const e of map.values()) e.quotes.forEach((list, i) => list.forEach(q => {
+    q.label = `${outcomeLabel(e.type, e.line, i)} (${periodLabel(e.period)})`;
+    q.team = e.type === 'total' ? '' : game.teams[i];
+  }));
+  return [...map.values()];
+}

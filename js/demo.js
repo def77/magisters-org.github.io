@@ -124,6 +124,7 @@ export function demoEsports() {
         gm('cs-mgl-mouz', 1, 'map_handicap', 'Map Handicap: MOUZ (-1.5) vs TheMongolz (+1.5)', ['MOUZ', 'TheMongolz'], 0.37, 0.36, -1.5),
         gm('cs-mgl-mouz', 2, 'child_moneyline', 'Counter-Strike: TheMongolz vs MOUZ - Map 1 Winner', ['TheMongolz', 'MOUZ'], 0.41, 0.40, null, 'Map 1 Winner'),
         gm('cs-mgl-mouz', 3, 'totals', 'Games Total: O/U 2.5', ['Over', 'Under'], 0.45, 0.44, 2.5, 'O/U 2.5 Games'),
+        gm('cs-mgl-mouz', 4, 'round_over_under_game_1', 'Map 1 Total Rounds: Over/Under 21.5', ['Over', 'Under'], 0.48, 0.47, 21.5),
       ] },
       { id: 'cs-eye-icp', slug: 'cs2-eye-icp-' + day(t2), title: 'Counter-Strike: Eyeballers vs IC Prospects (BO3) - Demo League', startTime: iso(t2), markets: [
         gm('cs-eye-icp', 0, 'moneyline', 'Counter-Strike: Eyeballers vs IC Prospects (BO3)', ['Eyeballers', 'IC Prospects'], 0.55, 0.54, null, 'Match Winner'),
@@ -152,6 +153,7 @@ export function demoEsports() {
     179: { t: 'spreads', p: 'result', h: 1.5, o: [[179, '1'], [180, '2']] },
     181: { t: 'totals', p: 'result', h: 2.5, o: [[181, 'Over'], [182, 'Under']] },
     161: { t: 'moneyline', p: 'result', h: 0, o: [[161, '1'], [162, '2']] },
+    183: { t: 'totals', p: 'p1', h: 23.5, o: [[183, 'Over'], [184, 'Under']] },
   };
   // participant 1 = MOUZ (swapped vs Polymarket order)
   const odds = {
@@ -160,6 +162,7 @@ export function demoEsports() {
       winline: { 171: [[171, 1.60], [172, 2.50]], 177: [[177, 2.95, 'home/-1.5'], [178, 1.47]], 173: [[173, 1.62], [174, 2.30]] },
       betboom: { 171: [[171, 1.58], [172, 2.48]], 173: [[173, 1.75], [174, 2.10]] },
       thunderpick: { 171: [[171, 1.57], [172, 2.55]], 181: [[181, 2.20], [182, 1.68]] },
+      ggbet: { 183: [[183, 1.88], [184, 1.90]] },
     }),
     id17demo2: papiOdds('id17demo2', {
       betboom: { 171: [[171, 1.70], [172, 2.10]], 175: [[175, 1.12], [176, 6.30]] },

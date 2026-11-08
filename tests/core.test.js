@@ -211,10 +211,62 @@ test('oddspapi diagnose: tolerant to wrappers, never leaks the key', async () =>
     const p = new OddsPapi(key);
     const report = await p.diagnose(17);
     assert.ok(report.includes('bookmakers (2)'));
-    assert.ok(report.includes('markets for sport: 7'));
+    assert.ok(report.includes('markets for sport: 8'));
     assert.ok(report.includes('spreads|result|-1.5'));
     assert.ok(report.includes('"home/-1.5"'));
     assert.ok(!report.includes(key));
     assert.ok(calls.every(u => u.includes('apiKey=' + key)));
   } finally { globalThis.fetch = realFetch; }
+});
+
+import { fairProbs, valueBets, findMiddles, middleNumbers } from '../js/value.js';
+import { lineEntries } from '../js/esports.js';
+
+test('value: de-vig Pinnacle and EV of a better price', () => {
+  const quotes = [
+    { set: [0], src: 'book', bookKey: 'pinnacle', price: 1.58, q: 1 / 1.58 },
+    { set: [1], src: 'book', bookKey: 'pinnacle', price: 2.55, q: 1 / 2.55 },
+    { set: [1], src: 'poly', bookKey: 'polymarket', price: 0.36, q: 0.3641 },
+  ];
+  const f = fairProbs(2, quotes);
+  assert.ok(Math.abs(f.probs[0] + f.probs[1] - 1) < 1e-12);
+  const [v] = valueBets(2, quotes, { minEV: 2, kellyFraction: 0.25, bankroll: 1000 });
+  assert.equal(v.quote.src, 'poly');
+  assert.ok(Math.abs(v.evPct - (f.probs[1] / 0.3641 - 1) * 100) < 1e-9);
+  assert.ok(v.stake > 0 && v.stake < 1000 * 0.25);
+  assert.equal(valueBets(2, quotes.slice(1), {}).length, 0, 'no sharp line => nothing');
+});
+
+test('middles: over low line + under high line', () => {
+  const n = middleNumbers(0.486, 1 / 1.9);
+  assert.ok(n.singlePct < 0 && n.singlePct > -2);
+  assert.ok(n.bothPct > 90);
+  const entries = [
+    { type: 'total', period: 'p1', line: 21.5, quotes: [[{ src: 'poly', book: 'Polymarket', q: 0.486, set: [0] }], []] },
+    { type: 'total', period: 'p1', line: 23.5, quotes: [[], [{ src: 'book', book: 'GG.bet', q: 1 / 1.9, set: [1] }]] },
+    { type: 'total', period: 'p1', line: 22, quotes: [[{ src: 'poly', q: 0.3, set: [0] }], [{ src: 'book', q: 0.3, set: [1] }]] }, // integer line: ignored
+  ];
+  const [m, ...rest] = findMiddles(entries, { maxLoss: 3 });
+  assert.equal(rest.length, 0);
+  assert.equal(m.width, 2);
+  assert.deepEqual(m.legs.map(l => l.line), [21.5, 23.5]);
+  // handicap: team0 +2.5 with team1 -1.5 is a middle, the reverse is not
+  const h = findMiddles([
+    { type: 'hcp', period: 'result', line: 2.5, quotes: [[{ src: 'poly', q: 0.45, set: [0] }], []] },
+    { type: 'hcp', period: 'result', line: 1.5, quotes: [[], [{ src: 'book', q: 0.56, set: [1] }]] },
+  ], { maxLoss: 3 });
+  assert.equal(h.length, 1);
+  assert.equal(h[0].width, 1);
+});
+
+test('demo esports produce value bets and a middle', () => {
+  const s = { ...DEFAULT_SETTINGS };
+  const d = demoEsports();
+  const g = parseGammaEsports(d.gamma.cs2[0], { id: 'cs2' });
+  const lines = oddsPapiLines(d.odds.id17demo1, d.markets, true, s);
+  const entries = lineEntries(g, lines, s);
+  const values = entries.flatMap(e => valueBets(2, [...e.quotes[0], ...e.quotes[1]], { minEV: 2 }));
+  assert.ok(values.some(v => v.quote.src === 'poly' && v.quote.label === 'П1 (матч)'));
+  const mids = findMiddles(entries, { maxLoss: 3 });
+  assert.ok(mids.some(m => m.type === 'total' && m.period === 'p1' && m.legs[0].src === 'poly' && m.legs[1].book === 'GG.bet'));
 });

@@ -65,6 +65,15 @@
           <label>Кэф не старше, мин <input id="maxQuoteAgeMin" type="number" step="5" min="0" title="Пропускать коэффициенты букмекера, которые не обновлялись дольше N минут. 0 = выключено"></label>
         </div>
 
+        <h3>Валуйки и коридоры</h3>
+        <div class="grid2">
+          <label>«Острый» бук <input id="sharpBook" placeholder="pinnacle" title="С его линии снимается маржа и считаются справедливые вероятности"></label>
+          <label>EV от, % <input id="minEV" type="number" step="0.5" min="0"></label>
+          <label>Доля Келли <input id="kellyFraction" type="number" step="0.05" min="0" max="1" title="0.25 = четверть Келли: безопаснее при ошибках в оценке"></label>
+          <label>Коридор: минус до, % <input id="maxMiddleLoss" type="number" step="0.5" min="0" title="Сколько можно потерять, если коридор не зайдёт"></label>
+        </div>
+        <label class="check"><input id="valuePolyOnly" type="checkbox"> Валуйки только на Polymarket</label>
+
         <h3>OddsPapi (киберспорт)</h3>
         <label>Ключ OddsPapi <input id="oddspapiKey" type="password" placeholder="oddspapi.io → Account" autocomplete="off"></label>
         <div class="row"><button type="button" id="papiCheck" class="ghost small">Проверить ключ</button><button type="button" id="papiDiag" class="ghost small" title="Собрать отчёт о формате ответов OddsPapi, чтобы прислать разработчику">Диагностика</button></div>
@@ -123,6 +132,8 @@
       </div>
       <nav class="tabs">
         <button class="tab active" data-panel="pArbs">Вилки <span id="tabArbsCount" class="badge">0</span></button>
+        <button class="tab" data-panel="pValue">Валуйки <span id="tabValueCount" class="badge">0</span></button>
+        <button class="tab" data-panel="pMiddle">Коридоры <span id="tabMiddleCount" class="badge">0</span></button>
         <button class="tab" data-panel="pMatches">Сопоставленные <span id="tabMatchCount" class="badge">0</span></button>
         <button class="tab" data-panel="pUnmatched">Без пары <span id="tabUnmatchedCount" class="badge">0</span></button>
         <button class="tab" data-panel="pJournal">Журнал</button>
@@ -133,6 +144,20 @@
         <div class="table-wrap"><table>
           <thead><tr><th>Профит</th><th>Событие</th><th>Тип ставки</th><th>Площадка · кэф</th><th>Лимит</th><th></th></tr></thead>
           <tbody id="arbBody"></tbody>
+        </table></div>
+      </div>
+      <div id="pValue" class="panel hidden">
+        <p class="note">Ставки дороже справедливой цены «острого» бука (по умолчанию Pinnacle, маржа снята). Это не вилка: выигрыш не гарантирован, перевес проявляется на дистанции. Сумма — доля Келли от банка.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>EV</th><th>Событие</th><th>Ставка</th><th>Справедл. кэф</th><th>Сумма</th><th></th></tr></thead>
+          <tbody id="valueBody"></tbody>
+        </table></div>
+      </div>
+      <div id="pMiddle" class="panel hidden">
+        <p class="note">Две ставки на разные линии. Если результат попадает между ними — выигрывают обе («коридор +N%»). Иначе выигрывает одна — слева показан результат на этот случай. Суммы — от банка из настроек.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Если одна</th><th>Событие</th><th>Ставки</th><th>Площадка · кэф · сумма</th><th></th></tr></thead>
+          <tbody id="middleBody"></tbody>
         </table></div>
       </div>
       <div id="pMatches" class="panel hidden">

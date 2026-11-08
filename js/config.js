@@ -40,6 +40,11 @@ export const DEFAULT_SETTINGS = {
   sports: ['cs2', 'dota2', 'lol', 'val', 'nba', 'epl'],
   minOdds: 1.01,
   maxOdds: 100,
+  sharpBook: 'pinnacle',     // value bets: fair line from this bookmaker
+  minEV: 2,                  // value bets: min expected value, %
+  kellyFraction: 0.25,       // value bets: share of full Kelly
+  valuePolyOnly: false,      // value bets: only Polymarket bets
+  maxMiddleLoss: 3,          // middles: max loss when only one bet wins, %
   maxQuoteAgeMin: 0,         // skip bookmaker prices not updated for this many minutes (0 = off)
   maxProfit: 25,             // above this an arb is almost always a matching / line error — flagged
   search: '',

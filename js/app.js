@@ -3,7 +3,8 @@ import { fetchPolymarket, fetchGammaEvents, fetchOdds, fetchBooks, parsePolyEven
 import { scan, applyDepth } from './scanner.js';
 import { polyCost, polyFeeRate } from './arb.js';
 import { OddsPapi } from './oddspapi.js';
-import { parseGammaEsports, matchFixture, oddsPapiLines, esportsArbs, periodLabel } from './esports.js';
+import { parseGammaEsports, matchFixture, oddsPapiLines, esportsArbs, lineEntries, periodLabel, outcomeLabel } from './esports.js';
+import { valueBets, findMiddles } from './value.js';
 import { loadJournal, saveJournal, entryPnl, expectedPnl, journalStats, toCSV } from './journal.js';
 import { demoData, demoBooks, demoEsports } from './demo.js';
 
@@ -20,7 +21,7 @@ const store = {
 };
 
 let S = { ...DEFAULT_SETTINGS, ...store.get(LS, {}) };
-let state = { overview: [], unmatched: [], arbs: [], lastScan: null, busy: false, timer: null, credits: null, papiUsed: 0, demo: false };
+let state = { overview: [], unmatched: [], arbs: [], values: [], middles: [], lastScan: null, busy: false, timer: null, credits: null, papiUsed: 0, demo: false };
 const alerted = new Set(store.get(SEEN, []));
 const hidden = new Set(store.get(HIDDEN, []));
 const firstSeen = store.get(FIRST, {});
@@ -46,7 +47,7 @@ function log(msg, level = 'info') {
 }
 
 /* ---------------- settings form ---------------- */
-const FIELDS = ['oddsApiKey', 'regions', 'bookmakers', 'oddspapiKey', 'oddspapiBooks', 'oddspapiMaxFixtures', 'scanHours',
+const FIELDS = ['sharpBook', 'minEV', 'kellyFraction', 'valuePolyOnly', 'maxMiddleLoss', 'oddsApiKey', 'regions', 'bookmakers', 'oddspapiKey', 'oddspapiBooks', 'oddspapiMaxFixtures', 'scanHours',
   'minProfit', 'maxProfit', 'minOdds', 'maxOdds', 'maxQuoteAgeMin', 'minLiquidity', 'polyFee', 'exchangeCommission', 'bankroll', 'roundTo', 'rubRate',
   'timeTolerance', 'matchThreshold', 'refreshSec', 'includeBookOnly', 'useOrderBook', 'corsProxy',
   'tgToken', 'tgChat', 'browserNotify', 'sportsOverride', 'search'];
@@ -123,6 +124,8 @@ async function runScan({ demo = false } = {}) {
     ]);
     let arbs = results.flatMap(r => r.arbs);
     const overview = results.flatMap(r => r.overview);
+    const values = results.flatMap(r => r.values || []).sort((a, b) => b.evPct - a.evPct);
+    const middles = results.flatMap(r => r.middles || []).sort((a, b) => b.singlePct - a.singlePct);
     const unmatched = results.flatMap(r => r.unmatched);
 
     if (S.useOrderBook && arbs.length) {
@@ -141,7 +144,7 @@ async function runScan({ demo = false } = {}) {
     for (const k of Object.keys(firstSeen)) if (now - firstSeen[k] > 2 * 86400e3) delete firstSeen[k];
     store.set(FIRST, firstSeen);
 
-    state = { ...state, overview, unmatched, arbs, lastScan: new Date(), demo };
+    state = { ...state, overview, unmatched, arbs, values, middles, lastScan: new Date(), demo };
     const shown = visibleArbs();
     log(`Готово: сопоставлено ${overview.length}, без пары ${unmatched.length}, вилок ${arbs.length} (показано ${shown.length})`, arbs.length ? 'ok' : 'info');
     render();
@@ -156,6 +159,9 @@ async function runScan({ demo = false } = {}) {
     schedule();
   }
 }
+
+const matchOf = m => ({ id: m.poly.id, title: m.poly.title, url: m.poly.url, sport: m.poly.sport, start: m.poly.start || m.odds.start, other: m.odds.title, score: m.score });
+const valueOpts = () => ({ sharpKey: S.sharpBook || 'pinnacle', minEV: S.minEV, kellyFraction: S.kellyFraction, bankroll: S.bankroll, polyOnly: S.valuePolyOnly });
 
 async function scanClassic(list, demo) {
   if (!list.length) return { arbs: [], overview: [], unmatched: [] };
@@ -181,7 +187,7 @@ async function scanClassic(list, demo) {
   const res = scan(polyGames, oddsBySport, S);
   const arbs = res.matches.flatMap(m => m.arbs.map(a => ({
     ...a, legs: a.legs.map(l => ({ ...l, team: l.label })),
-    match: { id: m.poly.id, title: m.poly.title, url: m.poly.url, sport: m.poly.sport, start: m.poly.start || m.odds.start, other: m.odds.title, score: m.score },
+    match: matchOf(m),
   })));
   const overview = res.matches.map(m => ({
     id: m.poly.id, title: m.poly.title, url: m.poly.url, sport: m.poly.sport, start: m.poly.start || m.odds.start,
@@ -189,12 +195,14 @@ async function scanClassic(list, demo) {
     lines: m.best ? [{ name: m.poly.outcomes.length === 3 ? '1X2' : 'Исход', sum: m.best.sum, legs: m.best.legs }] : [],
   }));
   const polyLegs = polyGames.flatMap(g => g.outcomes.flatMap(o => [o.yes, o.no].filter(Boolean)));
-  return { arbs, overview, unmatched: res.unmatched.map(g => ({ title: g.title, url: g.url, sport: g.sport, teams: g.outcomes.map(o => o.name) })), polyLegs };
+  const values = res.matches.flatMap(m => valueBets(m.poly.outcomes.length, m.quotes.filter(q => q.set.length === 1), valueOpts())
+    .map(v => ({ ...v, quote: { ...v.quote, team: v.quote.label }, match: matchOf(m) })));
+  return { arbs, values, overview, unmatched: res.unmatched.map(g => ({ title: g.title, url: g.url, sport: g.sport, teams: g.outcomes.map(o => o.name) })), polyLegs };
 }
 
 async function scanEsports(list, demo) {
   if (!list.length) return { arbs: [], overview: [], unmatched: [] };
-  const arbs = [], overview = [], unmatched = [], polyLegs = [];
+  const arbs = [], overview = [], unmatched = [], polyLegs = [], values = [], middles = [];
   let papi = null, marketsMap = {};
   const d = demo ? demoEsports() : null;
   if (!demo && S.oddspapiKey) {
@@ -236,6 +244,12 @@ async function scanEsports(list, demo) {
       const res = esportsArbs(p.game, lines, S);
       const match = { id: p.game.id, title: p.game.title, url: p.game.url, sport: sp.id, start: p.game.start || p.fixture.start, other: [p.game.tournament || p.fixture.tournament, p.fixture.title].filter(Boolean).join(' · '), score: p.score };
       arbs.push(...res.arbs.map(a => ({ ...a, legs: a.legs.map(l => ({ ...l })), match })));
+      const entries = lineEntries(p.game, lines, S);
+      for (const e of entries) {
+        const qs = [...e.quotes[0], ...e.quotes[1]];
+        values.push(...valueBets(2, qs, valueOpts()).map(v => ({ ...v, match })));
+      }
+      middles.push(...findMiddles(entries, { maxLoss: S.maxMiddleLoss, includeBookOnly: S.includeBookOnly }).map(x => ({ ...x, match })));
       overview.push({
         ...match, books: Object.keys(odds?.bookmakerOdds || {}).length,
         lines: res.compared.map(c => ({ name: `${c.best.legs[0].label.replace(/^.*\(/, '(')}`, label: c.best.legs.map(l => l.label.split(' ')[0]).join(' / '), sum: c.best.sum, legs: c.best.legs })),
@@ -243,7 +257,7 @@ async function scanEsports(list, demo) {
     }
     if (papi) { state.papiUsed = papi.used; log(`OddsPapi: потрачено запросов за скан — ${papi.used}`); }
   }
-  return { arbs, overview, unmatched, polyLegs };
+  return { arbs, values, middles, overview, unmatched, polyLegs };
 }
 
 /** Bookmaker stake limits (OddsPapi) cap the bankroll too. */
@@ -346,8 +360,10 @@ function render() {
   $('#tabArbsCount').textContent = arbs.length;
   $('#tabMatchCount').textContent = state.overview.length;
   $('#tabUnmatchedCount').textContent = state.unmatched.length;
+  $('#tabValueCount').textContent = filtered(state.values, v => [v.quote]).length;
+  $('#tabMiddleCount').textContent = filtered(state.middles, x => x.legs).length;
   $('#hiddenCount').textContent = hidden.size;
-  renderArbs(arbs); renderOverview(); renderUnmatched();
+  renderArbs(arbs); renderOverview(); renderUnmatched(); renderValues(); renderMiddles();
 }
 
 function renderArbs(arbs) {
@@ -380,6 +396,47 @@ function renderArbs(arbs) {
     tr.querySelector('[data-act="hide"]').addEventListener('click', () => { hidden.add(m.id); store.set(HIDDEN, [...hidden]); render(); });
     tb.append(tr);
   });
+}
+
+/** Same visibility rules as arbs: hidden events and search. */
+function filtered(list, legsOf) {
+  const q = (S.search || '').toLowerCase();
+  return list.filter(x => !hidden.has(x.match.id) &&
+    (!q || `${x.match.title} ${x.match.other} ${legsOf(x).map(l => l.book).join(' ')}`.toLowerCase().includes(q)));
+}
+
+function renderValues() {
+  const tb = $('#valueBody');
+  const list = filtered(state.values, v => [v.quote]);
+  if (!list.length) { tb.innerHTML = `<tr><td colspan="6" class="empty">${state.lastScan ? `Валуйных ставок с EV ≥ ${S.minEV}% нет. Для расчёта нужен «острый» бук (${esc(S.sharpBook)}) в линии матча.` : 'Нажмите «Сканировать» или «Демо».'}</td></tr>`; return; }
+  tb.innerHTML = list.map(v => {
+    const l = v.quote, m = v.match;
+    return `<tr>
+      <td class="nowrap"><span class="profit ${v.evPct >= 5 ? 'hot' : ''} ${v.evPct > S.maxProfit ? 'sus' : ''}">+${v.evPct.toFixed(2)}%</span></td>
+      <td><div class="ev">${esc(m.title)}</div><div class="sub">${esc(sportLabel(m.sport))} · ${fmtTime(m.start)}</div></td>
+      <td><div class="leg"><span class="lbl">${esc(l.label)}</span>${l.team && l.team !== l.label ? ` <span class="sub">${esc(l.team)}</span>` : ''}</div>
+        <div class="leg"><span class="src ${l.src}">${esc(l.book)}</span> <b>${fmtPrice(l)}</b>${freshness(l)}</div></td>
+      <td class="nowrap">${v.fairOdds.toFixed(2)}<div class="sub">${(v.p * 100).toFixed(1)}% · маржа ${esc(S.sharpBook)} ${(v.sharpMargin * 100).toFixed(1)}%</div></td>
+      <td class="nowrap"><b>${money(v.stake)}</b><div class="sub">${(v.kelly * S.kellyFraction * 100).toFixed(1)}% банка</div></td>
+      <td class="nowrap"><a class="ghost small btn" href="${l.src === 'poly' ? m.url : esc(l.url || m.url)}" target="_blank" rel="noopener">${l.src === 'poly' ? 'Poly' : 'БК'}</a></td></tr>`;
+  }).join('');
+}
+
+function renderMiddles() {
+  const tb = $('#middleBody');
+  const list = filtered(state.middles, x => x.legs);
+  if (!list.length) { tb.innerHTML = `<tr><td colspan="5" class="empty">${state.lastScan ? `Коридоров с минусом не больше ${S.maxMiddleLoss}% нет.` : 'Нажмите «Сканировать» или «Демо».'}</td></tr>`; return; }
+  tb.innerHTML = list.map(x => {
+    const m = x.match, bank = S.bankroll;
+    const what = `${x.type === 'hcp' ? 'фора' : 'тотал'} · ширина коридора ${x.width}`;
+    return `<tr>
+      <td class="nowrap"><span class="profit ${x.singlePct >= 0 ? 'hot' : ''}">${x.singlePct >= 0 ? '+' : ''}${x.singlePct.toFixed(2)}%</span>
+        <div class="sub">коридор +${x.bothPct.toFixed(0)}%</div></td>
+      <td><div class="ev">${esc(m.title)}</div><div class="sub">${esc(sportLabel(m.sport))} · ${fmtTime(m.start)} · ${esc(what)}</div></td>
+      <td>${x.legs.map(l => `<div class="leg"><span class="lbl">${esc(l.label)}</span>${l.team ? ` <span class="sub">${esc(l.team)}</span>` : ''}</div>`).join('')}</td>
+      <td>${x.legs.map((l, i) => `<div class="leg"><span class="src ${l.src}">${esc(l.book)}</span> <b>${fmtPrice(l)}</b> · ${money(bank * (i ? x.share2 : x.share1))}${freshness(l)}</div>`).join('')}</td>
+      <td class="nowrap"><a class="ghost small btn" href="${m.url}" target="_blank" rel="noopener">Poly</a></td></tr>`;
+  }).join('');
 }
 
 function renderOverview() {
