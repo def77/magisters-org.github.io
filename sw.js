@@ -1,11 +1,11 @@
 // Service worker: makes PolyArb installable and opens offline with the last version.
 // Own files: network first (updates show up immediately), cache as fallback.
 // API calls (Polymarket, OddsPapi, The Odds API, Telegram) are never cached.
-const CACHE = 'polyarb-v3';
+const CACHE = 'polyarb-v4';
 const SHELL = [
   './', 'index.html', 'css/style.css', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon.svg',
   'js/app.js', 'js/arb.js', 'js/config.js', 'js/demo.js', 'js/esports.js', 'js/journal.js',
-  'js/match.js', 'js/oddspapi.js', 'js/scanner.js', 'js/sources.js', 'js/value.js',
+  'js/match.js', 'js/oddspapi.js', 'js/scanner.js', 'js/sources.js', 'js/value.js', 'js/structure.js',
 ];
 
 self.addEventListener('install', e => {

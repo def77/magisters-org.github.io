@@ -41,9 +41,10 @@ export function parseGammaEsports(ev, sport) {
     const ask0 = num(m.bestAsk), bid0 = num(m.bestBid);
     if (outs.length !== 2 || ask0 == null) continue;
     const fee = feeOf(m);
+    const tick = num(m.orderPriceMinTickSize) || 0.01;
     let legs = [
-      { ask: ask0, token: tokens[0], fee },
-      { ask: bid0 != null && bid0 > 0 ? r4(1 - bid0) : null, token: tokens[1], fee },
+      { ask: ask0, bid: bid0, tick, token: tokens[0], fee },
+      { ask: bid0 != null && bid0 > 0 ? r4(1 - bid0) : null, bid: r4(1 - ask0), tick, token: tokens[1], fee },
     ];
     let line = type === 'ml' ? 0 : num(m.line);
     if (type !== 'ml' && line == null) continue;
@@ -117,13 +118,15 @@ export function oddsPapiLines(odds, marketsMap, swap, s = {}) {
       const order = type !== 'total' && swap ? [1, 0] : [0, 1];
       const key = marketKey(type, period, line);
       let entry = lines.get(key);
-      if (!entry) lines.set(key, entry = { quotes: [[], []] });
+      // OddsPapi outcome ids are the same at every book: keep them (in Polymarket order) for CLV lookups
+      if (!entry) lines.set(key, entry = { quotes: [[], []], mid: +mid, oids: order.map(k => +def.o[k][0]) });
       order.forEach((src, i) => {
         const p = prices[src];
         if (!p) return;
         entry.quotes[i].push({
           src: 'book', book: prettyBook(book), bookKey: book, price: p.price, q: bookCost(p.price, comm),
           limit: num(p.limit), updated: p.bookmakerChangedAt || p.changedAt, url: bo.fixturePath || null,
+          mkey: key, out: i, oid: entry.oids[i], mid: +mid,
         });
       });
     }
@@ -169,8 +172,8 @@ export function esportsArbs(game, lines, s) {
     const quotes = [];
     m.legs.forEach((l, i) => {
       if (l.ask > 0 && l.ask < 1) quotes.push({
-        set: [i], src: 'poly', book: 'Polymarket', bookKey: 'polymarket', side: 'YES', price: l.ask, token: l.token, fee: l.fee,
-        q: polyCost(l.ask, s.polyFee, l.fee), url: game.url,
+        set: [i], src: 'poly', book: 'Polymarket', bookKey: 'polymarket', side: 'YES', price: l.ask, bid: l.bid, tick: l.tick, token: l.token, fee: l.fee,
+        q: polyCost(l.ask, s.polyFee, l.fee), url: game.url, mkey: m.key, out: i, oid: line.oids?.[i], mid: line.mid,
       });
       for (const b of line.quotes[i]) {
         if (b.price < (s.minOdds || 1) || b.price > (s.maxOdds || 1e9)) continue;
@@ -200,7 +203,7 @@ export function lineEntries(game, lines, s = {}) {
   const entry = key => {
     if (!map.has(key)) {
       const [type, period, line] = key.split('|');
-      map.set(key, { key, type, period, line: +line, quotes: [[], []] });
+      map.set(key, { key, type, period, line: +line, quotes: [[], []], oids: lines.get(key)?.oids, mid: lines.get(key)?.mid });
     }
     return map.get(key);
   };
@@ -215,8 +218,8 @@ export function lineEntries(game, lines, s = {}) {
     const e = entry(m.key);
     m.legs.forEach((l, i) => {
       if (l.ask > 0 && l.ask < 1) e.quotes[i].push({
-        set: [i], src: 'poly', book: 'Polymarket', bookKey: 'polymarket', side: 'YES', price: l.ask, token: l.token, fee: l.fee,
-        q: polyCost(l.ask, s.polyFee, l.fee), url: game.url,
+        set: [i], src: 'poly', book: 'Polymarket', bookKey: 'polymarket', side: 'YES', price: l.ask, bid: l.bid, tick: l.tick, token: l.token, fee: l.fee,
+        q: polyCost(l.ask, s.polyFee, l.fee), url: game.url, mkey: m.key, out: i, oid: lines.get(m.key)?.oids?.[i], mid: lines.get(m.key)?.mid,
       });
     });
   }

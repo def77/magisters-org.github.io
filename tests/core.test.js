@@ -270,3 +270,59 @@ test('demo esports produce value bets and a middle', () => {
   const mids = findMiddles(entries, { maxLoss: 3 });
   assert.ok(mids.some(m => m.type === 'total' && m.period === 'p1' && m.legs[0].src === 'poly' && m.legs[1].book === 'GG.bet'));
 });
+
+import { makerPrice, makerArbs, coverArbs, bo3Covers } from '../js/structure.js';
+import { closingFair, legClv, entryPnl as jPnl } from '../js/journal.js';
+
+test('maker price: one tick above bid, or join bid on a 1-tick spread', () => {
+  assert.equal(makerPrice({ ask: 0.40, bid: 0.36, tick: 0.01 }), 0.37);
+  assert.equal(makerPrice({ ask: 0.36, bid: 0.35, tick: 0.01 }), 0.35);
+  assert.equal(makerPrice({ ask: 0.4, bid: null }), null);
+});
+
+test('maker arbs: limit order turns a non-arb into an arb, no taker fee', () => {
+  const quotes = [
+    { set: [0], src: 'poly', price: 0.40, bid: 0.36, tick: 0.01, q: 0.403, fee: { rate: 0.05, exponent: 1 } },
+    { set: [1], src: 'book', price: 1.65, q: 1 / 1.65 },
+  ];
+  const [a] = makerArbs(2, quotes, { minProfit: 0.5 });
+  const poly = a.legs.find(l => l.maker);
+  assert.equal(poly.price, 0.37);
+  assert.equal(poly.q, 0.37);
+  assert.ok(Math.abs(a.profitPct - (1 / (0.37 + 1 / 1.65) - 1) * 100) < 1e-9);
+});
+
+test('cover arbs: BO3 П1 + Ф2(+1.5) pays at least once, twice on 2:1', () => {
+  const entries = [
+    { key: 'ml|result|0', quotes: [[{ src: 'poly', q: 0.45, mkey: 'ml|result|0', set: [0] }], []] },
+    { key: 'hcp|result|-1.5', quotes: [[], [{ src: 'book', q: 0.50, mkey: 'hcp|result|-1.5', set: [1] }]] },
+  ];
+  const [c] = bo3Covers(entries, { minProfit: 0 });
+  assert.equal(c.legs.length, 2);
+  assert.equal(c.minCover, 1);
+  assert.deepEqual(c.counts, [1, 2, 1, 1]); // 2:0, 2:1, 1:2, 0:2
+  assert.ok(Math.abs(c.profitPct - (1 / 0.95 - 1) * 100) < 1e-9);
+  assert.ok(c.maxPct > 100);
+  // same-market pairs are ordinary arbs, not covers
+  assert.equal(coverArbs(2, [{ covers: [0], q: 0.4, src: 'poly', mkey: 'a' }, { covers: [1], q: 0.5, src: 'book', mkey: 'a' }]).length, 0);
+});
+
+test('CLV: closing fair odds from history, last price before start', () => {
+  const start = Date.parse('2026-11-08T18:00:00Z');
+  const hist = { bookmakers: { pinnacle: { markets: { 171: { outcomes: {
+    171: { players: { 0: [{ createdAt: '2026-11-08T17:59:00Z', price: 1.50 }, { createdAt: '2026-11-08T18:30:00Z', price: 1.10 }, { createdAt: '2026-11-08T12:00:00Z', price: 1.60 }] } },
+    172: { players: { 0: [{ createdAt: '2026-11-08T17:58:00Z', price: 2.70 }] } },
+  } } } } } };
+  const fair = closingFair(hist, 'pinnacle', 171, 172, start);
+  const p2 = (1 / 2.7) / (1 / 1.5 + 1 / 2.7);
+  assert.ok(Math.abs(fair - 1 / p2) < 1e-9);
+  assert.ok(Math.abs(legClv({ price: 3.0, closeFair: fair }) - (3 / fair - 1) * 100) < 1e-9);
+  assert.equal(closingFair(hist, 'pinnacle', 999, 172, start), null);
+});
+
+test('journal: lost and multi-win statuses', () => {
+  const e = { legs: [{ stake: 50, price: 2.2 }, { stake: 50, price: 2.0 }] };
+  assert.equal(jPnl({ ...e, status: 'lost' }).pnl, -100);
+  assert.ok(Math.abs(jPnl({ ...e, status: [0, 1] }).pnl - 110) < 1e-9);
+  assert.ok(Math.abs(jPnl({ ...e, status: '1' }).pnl - 0) < 1e-9);
+});

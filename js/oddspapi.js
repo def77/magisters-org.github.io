@@ -5,7 +5,7 @@ import { withProxy, parseDate } from './sources.js';
 const BASE = 'https://api.oddspapi.io/v4';
 // Responses are documented as bare arrays/objects; tolerate a { data } wrapper too.
 const unwrap = d => (Array.isArray(d) ? d : d && typeof d === 'object' && 'data' in d ? d.data : d);
-const COOLDOWN = { fixtures: 2000, odds: 500, markets: 1000, bookmakers: 1000, account: 1000 };
+const COOLDOWN = { fixtures: 2000, odds: 500, markets: 1000, bookmakers: 1000, account: 1000, 'historical-odds': 5000 };
 const last = {};
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
@@ -32,7 +32,7 @@ export class OddsPapi {
     for (let attempt = 0; attempt < 3; attempt++) {
       last[ep] = Date.now();
       const res = await fetch(withProxy(`${BASE}/${path}?${qs}`, this.proxy));
-      if (ep !== 'account') this.used++;
+      if (ep !== 'account' && ep !== 'historical-odds') this.used++; // both are free
       let body = null;
       try { body = await res.json(); } catch {}
       if (res.ok) return body;
@@ -46,6 +46,11 @@ export class OddsPapi {
   }
 
   account() { return this.get('account'); }
+
+  /** Price history of up to 3 bookmakers for one fixture (free endpoint, 5 s cooldown). */
+  async historical(fixtureId, bookmakers = 'pinnacle') {
+    return unwrap(await this.get('historical-odds', { fixtureId, bookmakers }));
+  }
 
   async bookmakers() {
     const k = 'polyarb.papi.bookmakers';

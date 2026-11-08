@@ -12,11 +12,11 @@ export function buildQuotes(poly, odds, bookNames, s) {
   poly.outcomes.forEach((o, i) => {
     if (o.yes?.ask > 0 && o.yes.ask < 1) quotes.push({
       set: [i], q: polyCost(o.yes.ask, s.polyFee, o.yes.fee), src: 'poly', book: 'Polymarket', bookKey: 'polymarket',
-      side: 'YES', price: o.yes.ask, token: o.yes.token, fee: o.yes.fee, label: o.name, url: poly.url,
+      side: 'YES', price: o.yes.ask, bid: o.yes.bid, tick: o.yes.tick, token: o.yes.token, fee: o.yes.fee, mkey: 'match', out: i, label: o.name, url: poly.url,
     });
     if (n > 2 && o.no?.ask > 0 && o.no.ask < 1) quotes.push({
       set: all.filter(j => j !== i), q: polyCost(o.no.ask, s.polyFee, o.no.fee), src: 'poly', book: 'Polymarket', bookKey: 'polymarket',
-      side: 'NO', price: o.no.ask, token: o.no.token, fee: o.no.fee, label: `НЕ ${o.name}`, url: poly.url,
+      side: 'NO', price: o.no.ask, bid: o.no.bid, tick: o.no.tick, token: o.no.token, fee: o.no.fee, mkey: 'match', label: `НЕ ${o.name}`, url: poly.url,
     });
   });
   for (const b of odds.books) {
@@ -27,7 +27,7 @@ export function buildQuotes(poly, odds, bookNames, s) {
       const o = b.prices[name];
       if (o > 1) quotes.push({
         set: [i], q: bookCost(o, comm), src: 'book', book: b.title, bookKey: b.key,
-        side: 'BACK', price: o, label: poly.outcomes[i].name, bookOutcome: name, updated: b.updated,
+        side: 'BACK', price: o, label: poly.outcomes[i].name, mkey: 'match', out: i, bookOutcome: name, updated: b.updated,
       });
     });
   }
@@ -67,10 +67,10 @@ export function applyDepth(arb, books, s) {
     if (!asks) continue;
     const others = arb.sum - leg.q;
     const feePct = (leg.q / leg.price - 1) * 100; // effective fee at the touch
-    leg.depth = bookDepth(asks, others, feePct, s.minProfit);
+    leg.depth = bookDepth(asks, others, feePct, s.minProfit, arb.minCover || 1);
     maxBank = Math.min(maxBank, maxBankrollFromLeg(arb, leg, leg.depth.usd * (1 + feePct / 100)));
   }
-  arb.profitPct = (1 / arb.sum - 1) * 100;
+  arb.profitPct = ((arb.minCover || 1) / arb.sum - 1) * 100;
   arb.maxBankroll = isFinite(maxBank) ? maxBank : null;
   return arb;
 }

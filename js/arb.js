@@ -102,8 +102,8 @@ export function stakes(arb, bankroll) {
  * asks: [{price, size}] (any order). othersQ: sum of q of the other legs.
  * Returns { usd, shares, vwap, bestAsk } of the fillable part.
  */
-export function bookDepth(asks, othersQ, feePct = 0, minProfit = 0) {
-  const maxSum = 1 / (1 + minProfit / 100);
+export function bookDepth(asks, othersQ, feePct = 0, minProfit = 0, cover = 1) {
+  const maxSum = cover / (1 + minProfit / 100);
   const limit = (maxSum - othersQ) / (1 + feePct / 100);
   let usd = 0, shares = 0;
   const sorted = [...asks].map(a => ({ price: +a.price, size: +a.size })).sort((a, b) => a.price - b.price);

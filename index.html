@@ -132,6 +132,8 @@
       </div>
       <nav class="tabs">
         <button class="tab active" data-panel="pArbs">Вилки <span id="tabArbsCount" class="badge">0</span></button>
+        <button class="tab" data-panel="pMaker">Лимитки <span id="tabMakerCount" class="badge">0</span></button>
+        <button class="tab" data-panel="pCover">Кросс-рынки <span id="tabCoverCount" class="badge">0</span></button>
         <button class="tab" data-panel="pValue">Валуйки <span id="tabValueCount" class="badge">0</span></button>
         <button class="tab" data-panel="pMiddle">Коридоры <span id="tabMiddleCount" class="badge">0</span></button>
         <button class="tab" data-panel="pMatches">Сопоставленные <span id="tabMatchCount" class="badge">0</span></button>
@@ -144,6 +146,20 @@
         <div class="table-wrap"><table>
           <thead><tr><th>Профит</th><th>Событие</th><th>Тип ставки</th><th>Площадка · кэф</th><th>Лимит</th><th></th></tr></thead>
           <tbody id="arbBody"></tbody>
+        </table></div>
+      </div>
+      <div id="pMaker" class="panel hidden">
+        <p class="note">Вилки, которые появляются, если на Polymarket не покупать по ask, а выставить лимитный ордер: на тик выше лучшего bid (или в bid, если спред — один тик). У мейкера на спортивных рынках нет комиссии. Ордер может не исполниться или исполниться частично — ставьте ногу у букмекера только после исполнения на Polymarket.</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Профит</th><th>Событие</th><th>Тип ставки</th><th>Площадка · цена</th><th>Лимит</th><th></th></tr></thead>
+          <tbody id="makerBody"></tbody>
+        </table></div>
+      </div>
+      <div id="pCover" class="panel hidden">
+        <p class="note">Вилки из разных рынков одного матча. В BO3 счёт бывает 2:0, 2:1, 1:2, 0:2 — например, П1 и Ф2(+1.5) вместе покрывают все варианты, а при 2:1 заходят обе ставки («до +N%»). Для футбола — вилки внутри самого Polymarket (YES на все исходы или связки NO).</p>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Профит</th><th>Событие</th><th>Ставки</th><th>Площадка · цена</th><th>Лимит</th><th></th></tr></thead>
+          <tbody id="coverBody"></tbody>
         </table></div>
       </div>
       <div id="pValue" class="panel hidden">
@@ -181,6 +197,7 @@
           <button type="button" class="ghost small" data-range="1">Сегодня</button>
           <button type="button" class="ghost small" data-range="7">7 дней</button>
           <button type="button" class="ghost small" data-range="30">30 дней</button>
+          <button type="button" id="jClv" class="ghost small" title="Точная линия закрытия по истории OddsPapi (бесплатно, ~5 сек на матч)">Обновить CLV</button>
           <button type="button" id="jExport" class="ghost small">CSV</button>
         </div>
         <div id="jSummary" class="stats"></div>

@@ -67,8 +67,8 @@ export function parsePolyEvent(ev, sport) {
     return {
       ...base, kind: 'moneyline',
       outcomes: [
-        { name: names[0], yes: leg(ask0, tokens[0], ml), no: null },
-        { name: names[1], yes: leg(ask1, tokens[1], ml), no: null },
+        { name: names[0], yes: leg(ask0, tokens[0], ml, bid0), no: null },
+        { name: names[1], yes: leg(ask1, tokens[1], ml, ask0 != null ? 1 - ask0 : null), no: null },
       ],
     };
   }
@@ -89,7 +89,7 @@ export function parsePolyEvent(ev, sport) {
       let name = m.groupItemTitle || (m.question || '').replace(/^will\s+/i, '').replace(/\s+win.*$/i, '');
       if (/draw|tie/i.test(m.question || '') && !m.groupItemTitle) name = 'Draw';
       if (/^draw|^tie/i.test(name)) name = 'Draw';
-      return { name, yes: leg(ask, tokens[0], m), no: leg(noAsk, tokens[1], m) };
+      return { name, yes: leg(ask, tokens[0], m, bid), no: leg(noAsk, tokens[1], m, ask != null ? 1 - ask : null) };
     });
     if (sport.outcomes === 3 && !outs.some(o => o.name === 'Draw')) return null;
     return { ...base, kind: sport.outcomes === 3 ? '1x2' : 'moneyline', outcomes: outs };
@@ -98,7 +98,9 @@ export function parsePolyEvent(ev, sport) {
 }
 
 const num = v => (v === undefined || v === null || v === '' || isNaN(+v) ? null : +v);
-const leg = (ask, token, m) => ({ ask: num(ask), token, marketId: m.id, minSize: num(m.orderMinSize), fee: feeOf(m) });
+const r4 = x => (x == null ? null : Math.round(x * 1e4) / 1e4);
+// bid = best price someone pays for this outcome now (for limit orders); tick = price step
+const leg = (ask, token, m, bid = null) => ({ ask: r4(num(ask)), bid: r4(num(bid)), tick: num(m.orderPriceMinTickSize) || 0.01, token, marketId: m.id, minSize: num(m.orderMinSize), fee: feeOf(m) });
 
 /** Raw Gamma events for one Polymarket series that have not finished yet. */
 export async function fetchGammaEvents(sport, proxy, hoursAhead = 48) {

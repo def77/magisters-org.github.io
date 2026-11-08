@@ -4,8 +4,9 @@ import { scan, applyDepth } from './scanner.js';
 import { polyCost, polyFeeRate } from './arb.js';
 import { OddsPapi } from './oddspapi.js';
 import { parseGammaEsports, matchFixture, oddsPapiLines, esportsArbs, lineEntries, periodLabel, outcomeLabel } from './esports.js';
-import { valueBets, findMiddles } from './value.js';
-import { loadJournal, saveJournal, entryPnl, expectedPnl, journalStats, toCSV } from './journal.js';
+import { valueBets, findMiddles, fairProbs } from './value.js';
+import { makerArbs, bo3Covers, polymarketInternal, isBo3 } from './structure.js';
+import { loadJournal, saveJournal, entryPnl, expectedPnl, journalStats, toCSV, legClv, closingFair } from './journal.js';
 import { demoData, demoBooks, demoEsports } from './demo.js';
 
 const $ = sel => document.querySelector(sel);
@@ -21,7 +22,7 @@ const store = {
 };
 
 let S = { ...DEFAULT_SETTINGS, ...store.get(LS, {}) };
-let state = { overview: [], unmatched: [], arbs: [], values: [], middles: [], lastScan: null, busy: false, timer: null, credits: null, papiUsed: 0, demo: false };
+let state = { overview: [], unmatched: [], arbs: [], makers: [], covers: [], values: [], middles: [], fair: new Map(), lastScan: null, busy: false, timer: null, credits: null, papiUsed: 0, demo: false };
 const alerted = new Set(store.get(SEEN, []));
 const hidden = new Set(store.get(HIDDEN, []));
 const firstSeen = store.get(FIRST, {});
@@ -127,26 +128,31 @@ async function runScan({ demo = false } = {}) {
     const values = results.flatMap(r => r.values || []).sort((a, b) => b.evPct - a.evPct);
     const middles = results.flatMap(r => r.middles || []).sort((a, b) => b.singlePct - a.singlePct);
     const unmatched = results.flatMap(r => r.unmatched);
+    const makers = results.flatMap(r => r.makers || []);
+    let covers = results.flatMap(r => r.covers || []);
+    const fair = new Map(results.flatMap(r => [...(r.fair || new Map())]));
 
-    if (S.useOrderBook && arbs.length) {
-      const tokens = arbs.flatMap(a => a.legs.filter(l => l.src === 'poly').map(l => l.token));
+    if (S.useOrderBook && (arbs.length || covers.length)) {
+      const tokens = [...arbs, ...covers].flatMap(a => a.legs.filter(l => l.src === 'poly').map(l => l.token));
       try {
         const books = demo ? demoBooks(tokens, results.flatMap(r => r.polyLegs || [])) : await fetchBooks(tokens, S.corsProxy);
-        arbs.forEach(a => applyDepth(a, books, S));
+        [...arbs, ...covers].forEach(a => applyDepth(a, books, S));
         log(`Стаканы CLOB: ${books.size} токенов`);
       } catch (e) { log('Стаканы CLOB: ' + e.message, 'error'); }
     }
-    arbs.forEach(applyBookLimits);
+    [...arbs, ...covers, ...makers].forEach(applyBookLimits);
     arbs = arbs.filter(a => a.profitPct >= S.minProfit);
+    covers = covers.filter(a => a.profitPct >= S.minProfit);
 
     const now = Date.now();
-    for (const a of arbs) { const k = arbKey(a); if (!firstSeen[k]) firstSeen[k] = now; a.firstSeen = firstSeen[k]; }
+    for (const a of [...arbs, ...makers, ...covers]) { const k = arbKey(a); if (!firstSeen[k]) firstSeen[k] = now; a.firstSeen = firstSeen[k]; }
     for (const k of Object.keys(firstSeen)) if (now - firstSeen[k] > 2 * 86400e3) delete firstSeen[k];
     store.set(FIRST, firstSeen);
 
-    state = { ...state, overview, unmatched, arbs, values, middles, lastScan: new Date(), demo };
+    state = { ...state, overview, unmatched, arbs, makers, covers, values, middles, fair, lastScan: new Date(), demo };
+    updateClosingFromScan();
     const shown = visibleArbs();
-    log(`Готово: сопоставлено ${overview.length}, без пары ${unmatched.length}, вилок ${arbs.length} (показано ${shown.length})`, arbs.length ? 'ok' : 'info');
+    log(`Готово: сопоставлено ${overview.length}, без пары ${unmatched.length}, вилок ${arbs.length} (показано ${shown.length}), лимиток ${makers.length}, кросс-рыночных ${covers.length}`, arbs.length ? 'ok' : 'info');
     render();
     if (!demo) await alertNew(shown);
     setStatus(`Обновлено ${state.lastScan.toLocaleTimeString()}${demo ? ' · ДЕМО' : ''}`, 'ok');
@@ -197,12 +203,21 @@ async function scanClassic(list, demo) {
   const polyLegs = polyGames.flatMap(g => g.outcomes.flatMap(o => [o.yes, o.no].filter(Boolean)));
   const values = res.matches.flatMap(m => valueBets(m.poly.outcomes.length, m.quotes.filter(q => q.set.length === 1), valueOpts())
     .map(v => ({ ...v, quote: { ...v.quote, team: v.quote.label }, match: matchOf(m) })));
-  return { arbs, values, overview, unmatched: res.unmatched.map(g => ({ title: g.title, url: g.url, sport: g.sport, teams: g.outcomes.map(o => o.name) })), polyLegs };
+  const withTeam = (a, m) => ({ ...a, legs: a.legs.map(l => ({ ...l, team: l.label })), match: matchOf(m) });
+  const makers = res.matches.flatMap(m => makerArbs(m.poly.outcomes.length, m.quotes, S).map(a => withTeam(a, m)));
+  const covers = res.matches.flatMap(m => polymarketInternal(m.poly.outcomes.length, m.quotes, S).map(a => ({ ...withTeam(a, m), kind: 'internal' })));
+  const fair = new Map();
+  for (const m of res.matches) {
+    const f = fairProbs(m.poly.outcomes.length, m.quotes, S.sharpBook || 'pinnacle');
+    if (f) fair.set(m.poly.id, new Map([['match', f.probs]]));
+  }
+  return { arbs, makers, covers, fair, values, overview, unmatched: res.unmatched.map(g => ({ title: g.title, url: g.url, sport: g.sport, teams: g.outcomes.map(o => o.name) })), polyLegs };
 }
 
 async function scanEsports(list, demo) {
   if (!list.length) return { arbs: [], overview: [], unmatched: [] };
-  const arbs = [], overview = [], unmatched = [], polyLegs = [], values = [], middles = [];
+  const arbs = [], overview = [], unmatched = [], polyLegs = [], values = [], middles = [], makers = [], covers = [];
+  const fair = new Map();
   let papi = null, marketsMap = {};
   const d = demo ? demoEsports() : null;
   if (!demo && S.oddspapiKey) {
@@ -242,13 +257,19 @@ async function scanEsports(list, demo) {
       catch (e) { log(`OddsPapi ${p.fixture.title}: ${e.message}`, 'error'); if (e.status === 401 || e.status === 403 || e.status === 429) break; continue; }
       const lines = oddsPapiLines(odds, marketsMap, p.swap, S);
       const res = esportsArbs(p.game, lines, S);
-      const match = { id: p.game.id, title: p.game.title, url: p.game.url, sport: sp.id, start: p.game.start || p.fixture.start, other: [p.game.tournament || p.fixture.tournament, p.fixture.title].filter(Boolean).join(' · '), score: p.score };
+      const match = { id: p.game.id, title: p.game.title, url: p.game.url, sport: sp.id, start: p.game.start || p.fixture.start, other: [p.game.tournament || p.fixture.tournament, p.fixture.title].filter(Boolean).join(' · '), score: p.score, papiFixtureId: p.fixture.id };
       arbs.push(...res.arbs.map(a => ({ ...a, legs: a.legs.map(l => ({ ...l })), match })));
       const entries = lineEntries(p.game, lines, S);
+      const fm = new Map();
       for (const e of entries) {
         const qs = [...e.quotes[0], ...e.quotes[1]];
         values.push(...valueBets(2, qs, valueOpts()).map(v => ({ ...v, match })));
+        makers.push(...makerArbs(2, qs, S).map(a => ({ ...a, legs: a.legs.map(l => ({ ...l })), match })));
+        const f = fairProbs(2, qs, S.sharpBook || 'pinnacle');
+        if (f) fm.set(e.key, f.probs);
       }
+      fair.set(match.id, fm);
+      if (isBo3(p.game.title, entries.map(e => e.key))) covers.push(...bo3Covers(entries, S).map(a => ({ ...a, legs: a.legs.map(l => ({ ...l })), match, kind: 'bo3' })));
       middles.push(...findMiddles(entries, { maxLoss: S.maxMiddleLoss, includeBookOnly: S.includeBookOnly }).map(x => ({ ...x, match })));
       overview.push({
         ...match, books: Object.keys(odds?.bookmakerOdds || {}).length,
@@ -257,7 +278,7 @@ async function scanEsports(list, demo) {
     }
     if (papi) { state.papiUsed = papi.used; log(`OddsPapi: потрачено запросов за скан — ${papi.used}`); }
   }
-  return { arbs, values, middles, overview, unmatched, polyLegs };
+  return { arbs, makers, covers, fair, values, middles, overview, unmatched, polyLegs };
 }
 
 /** Bookmaker stake limits (OddsPapi) cap the bankroll too. */
@@ -277,9 +298,9 @@ function schedule() {
 /* ---------------- filtering ---------------- */
 const arbKey = a => a.match.id + '|' + a.legs.map(l => `${l.bookKey}:${l.label}`).join('/');
 
-function visibleArbs() {
+function visibleArbs(source = state.arbs) {
   const q = (S.search || '').toLowerCase();
-  let list = state.arbs.filter(a => {
+  let list = source.filter(a => {
     if (hidden.has(a.match.id)) return false;
     if (a.legs.some(l => l.src === 'book' && (l.price < S.minOdds || l.price > S.maxOdds))) return false;
     if (S.minLiquidity && a.maxBankroll != null && a.maxBankroll < S.minLiquidity) return false;
@@ -331,7 +352,9 @@ function beep() {
 
 /* ---------------- formatting ---------------- */
 function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-const fmtPrice = l => l.src === 'poly' ? `${(l.price * 100).toFixed(1)}¢ (${(1 / l.q).toFixed(2)})` : (+l.price).toFixed(2);
+const fmtPrice = l => l.src === 'poly'
+  ? `${l.maker ? 'лимит ' : ''}${(l.price * 100).toFixed(1)}¢ (${(1 / l.q).toFixed(2)})${l.maker && l.takerPrice ? ` <span class="sub">ask ${(l.takerPrice * 100).toFixed(1)}¢</span>` : ''}`
+  : (+l.price).toFixed(2);
 const fmtTime = d => d ? new Date(d).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—';
 const money = v => (v < 0 ? '−$' : '$') + (Math.abs(v) >= 100 ? Math.round(Math.abs(v)).toLocaleString() : Math.abs(+v).toFixed(2));
 const rub = v => S.rubRate > 0 ? ` <span class="sub">≈ ${Math.round(v * S.rubRate).toLocaleString()} ₽</span>` : '';
@@ -362,14 +385,20 @@ function render() {
   $('#tabUnmatchedCount').textContent = state.unmatched.length;
   $('#tabValueCount').textContent = filtered(state.values, v => [v.quote]).length;
   $('#tabMiddleCount').textContent = filtered(state.middles, x => x.legs).length;
+  const makersShown = visibleArbs(state.makers), coversShown = visibleArbs(state.covers);
+  $('#tabMakerCount').textContent = makersShown.length;
+  $('#tabCoverCount').textContent = coversShown.length;
   $('#hiddenCount').textContent = hidden.size;
-  renderArbs(arbs); renderOverview(); renderUnmatched(); renderValues(); renderMiddles();
+  renderArbs(arbs);
+  renderArbs(makersShown, '#makerBody', 'Лимитных вилок нет: на этих матчах лимитный ордер не даёт плюса.');
+  renderArbs(coversShown, '#coverBody', 'Кросс-рыночных вилок нет.');
+  renderOverview(); renderUnmatched(); renderValues(); renderMiddles();
 }
 
-function renderArbs(arbs) {
-  const tb = $('#arbBody');
+function renderArbs(arbs, sel = '#arbBody', emptyText = 'Вилок по фильтрам нет. Снизьте «Мин. профит» или посмотрите вкладку «Сопоставленные».') {
+  const tb = $(sel);
   if (!arbs.length) {
-    tb.innerHTML = `<tr><td colspan="6" class="empty">${state.lastScan ? 'Вилок по фильтрам нет. Снизьте «Мин. профит» или посмотрите вкладку «Сопоставленные».' : 'Нажмите «Сканировать» или «Демо».'}</td></tr>`;
+    tb.innerHTML = `<tr><td colspan="6" class="empty">${state.lastScan ? emptyText : 'Нажмите «Сканировать» или «Демо».'}</td></tr>`;
     return;
   }
   tb.innerHTML = '';
@@ -380,6 +409,7 @@ function renderArbs(arbs) {
     tr.className = 'arb-row' + (calc?.arb === a ? ' selected' : '');
     tr.innerHTML = `
       <td class="nowrap c-profit"><span class="profit ${a.profitPct >= 2 ? 'hot' : ''} ${suspicious ? 'sus' : ''}" title="${suspicious ? 'Подозрительно высокий профит — проверьте линию и сопоставление' : ''}">${a.profitPct.toFixed(2)}%</span>
+        ${a.maxPct != null && a.maxPct - a.profitPct > 0.5 ? `<div class="sub pos">до +${a.maxPct.toFixed(0)}%</div>` : ''}
         <div class="sub">${a.firstSeen ? ago(a.firstSeen) : ''}</div></td>
       <td class="c-event"><div class="ev">${esc(m.title)}</div><div class="sub">${esc(sportLabel(m.sport))} · ${fmtTime(m.start)}</div>
         <div class="sub dim">${esc(m.other)} · совпадение ${(m.score * 100).toFixed(0)}%</div></td>
@@ -409,7 +439,7 @@ function renderValues() {
   const tb = $('#valueBody');
   const list = filtered(state.values, v => [v.quote]);
   if (!list.length) { tb.innerHTML = `<tr><td colspan="6" class="empty">${state.lastScan ? `Валуйных ставок с EV ≥ ${S.minEV}% нет. Для расчёта нужен «острый» бук (${esc(S.sharpBook)}) в линии матча.` : 'Нажмите «Сканировать» или «Демо».'}</td></tr>`; return; }
-  tb.innerHTML = list.map(v => {
+  tb.innerHTML = list.map((v, idx) => {
     const l = v.quote, m = v.match;
     return `<tr>
       <td class="nowrap"><span class="profit ${v.evPct >= 5 ? 'hot' : ''} ${v.evPct > S.maxProfit ? 'sus' : ''}">+${v.evPct.toFixed(2)}%</span></td>
@@ -418,7 +448,8 @@ function renderValues() {
         <div class="leg"><span class="src ${l.src}">${esc(l.book)}</span> <b>${fmtPrice(l)}</b>${freshness(l)}</div></td>
       <td class="nowrap">${v.fairOdds.toFixed(2)}<div class="sub">${(v.p * 100).toFixed(1)}% · маржа ${esc(S.sharpBook)} ${(v.sharpMargin * 100).toFixed(1)}%</div></td>
       <td class="nowrap"><b>${money(v.stake)}</b><div class="sub">${(v.kelly * S.kellyFraction * 100).toFixed(1)}% банка</div></td>
-      <td class="nowrap"><a class="ghost small btn" href="${l.src === 'poly' ? m.url : esc(l.url || m.url)}" target="_blank" rel="noopener">${l.src === 'poly' ? 'Poly' : 'БК'}</a></td></tr>`;
+      <td class="nowrap actions-cell"><a class="ghost small btn" href="${l.src === 'poly' ? m.url : esc(l.url || m.url)}" target="_blank" rel="noopener">${l.src === 'poly' ? 'Poly' : 'БК'}</a>
+        <button class="ghost small" data-vj="${idx}" title="Записать в журнал (для учёта и CLV)">В журнал</button></td></tr>`;
   }).join('');
 }
 
@@ -492,7 +523,12 @@ function calcNumbers() {
   stakes = stakes.map((s, i) => a.legs[i].src === 'book' && S.roundTo > 0 ? Math.round(s / S.roundTo) * S.roundTo : s);
   const total = stakes.reduce((x, y) => x + y, 0);
   const payouts = stakes.map((s, i) => s / qs[i]);
-  const profit = Math.min(...payouts) - total;
+  let worst = Math.min(...payouts);
+  if (a.legs.every(l => Array.isArray(l.covers))) { // cross-market: a final state may pay several legs
+    const n = Math.max(...a.legs.flatMap(l => l.covers)) + 1;
+    worst = Math.min(...Array.from({ length: n }, (_, st) => a.legs.reduce((sum, l, i) => sum + (l.covers.includes(st) ? payouts[i] : 0), 0)));
+  }
+  const profit = worst - total;
   return { qs, sum, stakes, total, payouts, profit, pct: total ? profit / total * 100 : 0 };
 }
 
@@ -514,7 +550,7 @@ function renderCalc() {
     </div>`;
   }).join('') + `<div class="calc-sum">
       <label>Итого $ <input id="calcBank" type="number" step="10" value="${n.total.toFixed(2)}"></label>
-      <span>Выплата: <b>${money(Math.min(...n.payouts))}</b>${rub(Math.min(...n.payouts))}</span>
+      <span>Выплата (мин.): <b>${money(n.profit + n.total)}</b>${rub(n.profit + n.total)}</span>
       <span>Профит: <b class="${n.profit >= 0 ? 'pos' : 'negv'}">${money(n.profit)} (${n.pct.toFixed(2)}%)</b>${rub(n.profit)}</span>
       ${a.maxBankroll != null && n.total > a.maxBankroll ? `<span class="warn">Больше лимита (${money(a.maxBankroll)})</span>` : ''}
     </div>`;
@@ -526,14 +562,66 @@ let journal = loadJournal();
 function saveCalcToJournal() {
   if (!calc) return;
   const a = calc.arb, n = calcNumbers();
+  addToJournal(a.match, a.legs.map((l, i) => ({ l, price: 1 / n.qs[i], stake: n.stakes[i] })), n.pct);
+}
+
+/** legs: [{ l: quote, price: net decimal odds, stake }] */
+function addToJournal(match, legs, profitPct = null) {
   journal.unshift({
-    id: Date.now().toString(36), ts: Date.now(), event: a.match.title, sport: sportLabel(a.match.sport), profitPct: n.pct,
-    legs: a.legs.map((l, i) => ({ book: l.book, label: `${l.label}${l.team && l.team !== l.label ? ' ' + l.team : ''}`, price: +(1 / n.qs[i]).toFixed(4), stake: +n.stakes[i].toFixed(2) })),
+    id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), ts: Date.now(), event: match.title, sport: sportLabel(match.sport), profitPct,
+    matchId: match.id, start: match.start ? new Date(match.start).getTime() : null, papiFixtureId: match.papiFixtureId || null,
+    legs: legs.map(({ l, price, stake }) => ({
+      book: l.book, bookKey: l.bookKey, src: l.src, label: `${l.label}${l.team && l.team !== l.label ? ' ' + l.team : ''}`,
+      price: +price.toFixed(4), stake: +stake.toFixed(2), mkey: l.mkey ?? null, out: l.out ?? (l.set?.length === 1 ? l.set[0] : null), oid: l.oid ?? null, mid: l.mid ?? null,
+    })),
     status: 'pending',
   });
   saveJournal(journal);
   log('Сохранено в журнал', 'ok');
   renderJournal();
+}
+
+/** Closing line from scans: the sharp book's fair odds, kept fresh until the match starts. */
+function updateClosingFromScan() {
+  const now = Date.now();
+  let changed = false;
+  for (const e of journal) {
+    if (!e.matchId || (e.start && e.start <= now)) continue;
+    const fm = state.fair.get(e.matchId);
+    if (!fm) continue;
+    for (const l of e.legs) {
+      if (l.closeSrc === 'history' || l.out == null || !l.mkey) continue;
+      const probs = fm.get(l.mkey);
+      if (!probs?.[l.out]) continue;
+      l.closeFair = 1 / probs[l.out]; l.closeSrc = 'scan'; l.closeAt = now; changed = true;
+    }
+  }
+  if (changed) saveJournal(journal);
+}
+
+/** Exact closing line from OddsPapi price history (free endpoint) for started esports matches. */
+async function refreshClvFromHistory() {
+  if (!S.oddspapiKey) return log('Для CLV по истории нужен ключ OddsPapi', 'warn');
+  const papi = new OddsPapi(S.oddspapiKey, { proxy: S.corsProxy });
+  const sharp = S.sharpBook || 'pinnacle';
+  const todo = journal.filter(e => e.papiFixtureId && e.start && e.start < Date.now() && e.legs.some(l => l.oid && l.mid && l.closeSrc !== 'history'));
+  if (!todo.length) return log('Нет начавшихся киберспортивных матчей без CLV', 'info');
+  const byFixture = new Map();
+  for (const e of todo) { if (!byFixture.has(e.papiFixtureId)) byFixture.set(e.papiFixtureId, []); byFixture.get(e.papiFixtureId).push(e); }
+  log(`CLV: запрашиваю историю ${sharp} по ${byFixture.size} матч(ам), ~5 сек на матч…`);
+  let n = 0;
+  for (const [fid, entries] of byFixture) {
+    try {
+      const hist = await papi.historical(fid, sharp);
+      for (const e of entries) for (const l of e.legs) {
+        if (!l.oid || !l.mid) continue;
+        const f = closingFair(hist, sharp, l.mid, l.oid, e.start);
+        if (f) { l.closeFair = f; l.closeSrc = 'history'; n++; }
+      }
+    } catch (err) { log(`CLV ${fid}: ${err.message}`, 'error'); }
+  }
+  saveJournal(journal); renderJournal();
+  log(`CLV обновлён для ${n} ставок`, n ? 'ok' : 'info');
 }
 
 function renderJournal() {
@@ -544,7 +632,8 @@ function renderJournal() {
     <div class="stat"><span>Ставок</span><b>${st.entries.length}</b></div>
     <div class="stat"><span>Оборот</span><b>${money(st.turnover)}</b></div>
     <div class="stat"><span>Прибыль</span><b class="${st.profit >= 0 ? 'pos' : 'negv'}">${money(st.profit)}</b></div>
-    <div class="stat"><span>Доходность</span><b>${st.roi.toFixed(2)}%</b></div>`;
+    <div class="stat"><span>Доходность</span><b>${st.roi.toFixed(2)}%</b></div>
+    <div class="stat" title="Средний CLV по ставкам с известной линией закрытия: насколько взятые кэфы лучше справедливой финальной линии ${esc(S.sharpBook)}"><span>CLV</span><b class="${st.clv == null ? '' : st.clv >= 0 ? 'pos' : 'negv'}">${st.clv == null ? '—' : (st.clv >= 0 ? '+' : '') + st.clv.toFixed(2) + '%'}</b></div>`;
   const days = [...st.byDay.entries()].sort();
   const maxAbs = Math.max(1, ...days.map(([, v]) => Math.abs(v)));
   $('#jChart').innerHTML = days.length ? days.map(([d, v]) => `<div class="bar-wrap" title="${d}: ${money(v)}"><div class="bar ${v >= 0 ? 'up' : 'down'}" style="height:${Math.max(2, Math.abs(v) / maxAbs * 100)}%"></div><span>${d.slice(5)}</span></div>`).join('') : '<span class="sub">Нет рассчитанных ставок</span>';
@@ -555,10 +644,13 @@ function renderJournal() {
     return `<tr data-id="${e.id}">
       <td class="nowrap">${fmtTime(e.ts)}</td>
       <td><div class="ev">${esc(e.event)}</div><div class="sub">${esc(e.sport)} · ожид. ${money(expectedPnl(e))}</div></td>
-      <td>${e.legs.map(l => `<div class="leg"><b>${esc(l.book)}</b> ${esc(l.label)} @ ${(+l.price).toFixed(2)} · ${money(l.stake)}</div>`).join('')}</td>
+      <td>${e.legs.map(l => { const c = legClv(l); return `<div class="leg"><b>${esc(l.book)}</b> ${esc(l.label)} @ ${(+l.price).toFixed(2)} · ${money(l.stake)}${c != null ? ` <span class="${c >= 0 ? 'pos' : 'negv'}" title="Закрытие ${esc(S.sharpBook)} без маржи: ${l.closeFair.toFixed(2)} (${l.closeSrc === 'history' ? 'по истории OddsPapi' : 'последний скан до старта'})">CLV ${c >= 0 ? '+' : ''}${c.toFixed(1)}%</span>` : ''}</div>`; }).join('')}</td>
       <td class="nowrap">${money(total)}</td>
-      <td><select data-status>${['pending', 'void', ...e.legs.map((_, i) => String(i))].map(v =>
-        `<option value="${v}" ${String(e.status) === v ? 'selected' : ''}>${v === 'pending' ? 'Ожидает' : v === 'void' ? 'Возврат' : 'Зашла: ' + esc(e.legs[+v].book)}</option>`).join('')}</select></td>
+      <td><select data-status>${['pending', 'void', 'lost', ...e.legs.map((_, i) => String(i)), ...(e.legs.length > 1 ? ['all'] : [])].map(v => {
+        const cur = Array.isArray(e.status) ? 'all' : String(e.status);
+        const text = v === 'pending' ? 'Ожидает' : v === 'void' ? 'Возврат' : v === 'lost' ? 'Не зашла' : v === 'all' ? 'Зашли все' : 'Зашла: ' + esc(e.legs[+v].book) + (e.legs.length > 1 ? ' ' + esc(e.legs[+v].label.split(' ')[0]) : '');
+        return `<option value="${v}" ${cur === v ? 'selected' : ''}>${text}</option>`;
+      }).join('')}</select></td>
       <td class="nowrap ${settled ? (pnl >= 0 ? 'pos' : 'negv') : 'sub'}">${settled ? money(pnl) : '—'}</td>
       <td><button class="ghost small" data-del>✕</button></td></tr>`;
   }).join('') : '<tr><td colspan="7" class="empty">Журнал пуст. Откройте калькулятор у вилки и нажмите «Сохранить в журнал».</td></tr>';
@@ -675,13 +767,20 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!e.target.matches('[data-status]')) return;
     const id = e.target.closest('tr').dataset.id;
     const en = journal.find(x => x.id === id);
-    en.status = e.target.value; saveJournal(journal); renderJournal();
+    en.status = e.target.value === 'all' ? en.legs.map((_, i) => i) : e.target.value; saveJournal(journal); renderJournal();
   });
   $('#jBody').addEventListener('click', e => {
     if (!e.target.matches('[data-del]')) return;
     const id = e.target.closest('tr').dataset.id;
     if (!confirm('Удалить запись из журнала?')) return;
     journal = journal.filter(x => x.id !== id); saveJournal(journal); renderJournal();
+  });
+  $('#jClv').addEventListener('click', () => { readForm(); refreshClvFromHistory(); });
+  $('#valueBody').addEventListener('click', e => {
+    const b = e.target.closest('[data-vj]');
+    if (!b) return;
+    const v = filtered(state.values, x => [x.quote])[+b.dataset.vj];
+    if (v) addToJournal(v.match, [{ l: v.quote, price: 1 / v.quote.q, stake: Math.max(1, v.stake) }], v.evPct);
   });
   $('#jExport').addEventListener('click', () => {
     const blob = new Blob(['﻿' + toCSV(journal)], { type: 'text/csv' });
