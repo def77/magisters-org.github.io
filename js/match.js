@@ -1,7 +1,7 @@
 // Team-name normalization and event matching between Polymarket and bookmakers.
 import { ALIASES } from './config.js';
 
-const STOP = new Set(['fc', 'cf', 'afc', 'sc', 'ac', 'cd', 'sv', 'fk', 'bk', 'the', 'club', 'de', 'calcio', 'ssc', 'us', 'as', 'rc', 'vfb', 'vfl', 'tsg', '1', 'and']);
+const STOP = new Set(['fc', 'cf', 'afc', 'sc', 'ac', 'cd', 'sv', 'fk', 'bk', 'the', 'club', 'de', 'calcio', 'ssc', 'us', 'as', 'rc', 'vfb', 'vfl', 'tsg', '1', 'and', 'esports', 'esport', 'gaming', 'team', 'gg']);
 
 export function normalize(name) {
   if (!name) return '';

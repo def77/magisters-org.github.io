@@ -83,18 +83,89 @@ export function demoData() {
   return { gamma, odds };
 }
 
-/** Fake order books around the Gamma best ask. */
-export function demoBooks(tokens, games) {
+/** Fake order books around the Gamma best ask. legs: [{token, ask}] */
+export function demoBooks(tokens, legs) {
   const map = new Map();
-  const askOf = new Map();
-  for (const g of games) for (const o of g.outcomes) {
-    if (o.yes) askOf.set(o.yes.token, o.yes.ask);
-    if (o.no) askOf.set(o.no.token, o.no.ask);
-  }
+  const askOf = new Map(legs.filter(l => l && l.token).map(l => [l.token, l.ask]));
   for (const t of tokens) {
     const a = askOf.get(t);
     if (a == null) continue;
     map.set(t, [0, 0.01, 0.02, 0.03].map((d, i) => ({ price: (a + d).toFixed(3), size: String([900, 1500, 2500, 4000][i]) })));
   }
   return map;
+}
+
+/* ---------- esports demo: Gamma events + OddsPapi v4 shapes ---------- */
+const FEE = { feesEnabled: true, feeSchedule: { rate: 0.05, exponent: 1, takerOnly: true } };
+function gm(slug, i, type, question, outcomes, ask, bid, line, group) {
+  return { id: `${slug}-${i}`, question, sportsMarketType: type, groupItemTitle: group || question, active: true, closed: false,
+    outcomes: JSON.stringify(outcomes), clobTokenIds: JSON.stringify([`${slug}-${i}-a`, `${slug}-${i}-b`]), bestAsk: ask, bestBid: bid, line, ...FEE };
+}
+function papiOdds(fixtureId, books) {
+  const bookmakerOdds = {};
+  for (const [slug, markets] of Object.entries(books)) {
+    const mk = {};
+    for (const [mid, prices] of Object.entries(markets)) {
+      const outcomes = {};
+      prices.forEach(([oid, price, label], k) => { outcomes[oid] = { players: { 0: { active: true, price, limit: [500, 1500, 3000][k % 3], bookmakerOutcomeId: label || String(oid), changedAt: new Date().toISOString() } } }; });
+      mk[mid] = { marketActive: true, outcomes };
+    }
+    bookmakerOdds[slug] = { bookmakerIsActive: true, suspended: false, fixturePath: `https://example.com/${slug}/${fixtureId}`, markets: mk };
+  }
+  return { fixtureId, bookmakerOdds };
+}
+
+export function demoEsports() {
+  const t1 = h(4), t2 = h(9), t3 = h(20);
+  const gamma = {
+    cs2: [
+      { id: 'cs-mgl-mouz', slug: 'cs2-mgl-mouz-' + day(t1), title: 'Counter-Strike: TheMongolz vs MOUZ (BO3) - Demo Masters Playoffs', startTime: iso(t1), markets: [
+        gm('cs-mgl-mouz', 0, 'moneyline', 'Counter-Strike: TheMongolz vs MOUZ (BO3)', ['TheMongolz', 'MOUZ'], 0.36, 0.35, null, 'Match Winner'),
+        gm('cs-mgl-mouz', 1, 'map_handicap', 'Map Handicap: MOUZ (-1.5) vs TheMongolz (+1.5)', ['MOUZ', 'TheMongolz'], 0.37, 0.36, -1.5),
+        gm('cs-mgl-mouz', 2, 'child_moneyline', 'Counter-Strike: TheMongolz vs MOUZ - Map 1 Winner', ['TheMongolz', 'MOUZ'], 0.41, 0.40, null, 'Map 1 Winner'),
+        gm('cs-mgl-mouz', 3, 'totals', 'Games Total: O/U 2.5', ['Over', 'Under'], 0.45, 0.44, 2.5, 'O/U 2.5 Games'),
+      ] },
+      { id: 'cs-eye-icp', slug: 'cs2-eye-icp-' + day(t2), title: 'Counter-Strike: Eyeballers vs IC Prospects (BO3) - Demo League', startTime: iso(t2), markets: [
+        gm('cs-eye-icp', 0, 'moneyline', 'Counter-Strike: Eyeballers vs IC Prospects (BO3)', ['Eyeballers', 'IC Prospects'], 0.55, 0.54, null, 'Match Winner'),
+        gm('cs-eye-icp', 1, 'child_moneyline', 'Counter-Strike: Eyeballers vs IC Prospects - Map 2 Winner', ['Eyeballers', 'IC Prospects'], 0.83, 0.82, null, 'Map 2 Winner'),
+      ] },
+    ],
+    dota2: [
+      { id: 'dota-ts-gg', slug: 'dota2-ts-gg-' + day(t3), title: 'Dota 2: Team Spirit vs Gaimin Gladiators (BO3) - Demo Cup', startTime: iso(t3), markets: [
+        gm('dota-ts-gg', 0, 'moneyline', 'Dota 2: Team Spirit vs Gaimin Gladiators (BO3)', ['Team Spirit', 'Gaimin Gladiators'], 0.6, 0.59, null, 'Match Winner'),
+      ] },
+    ],
+  };
+  const fixtures = {
+    cs2: [
+      { id: 'id17demo1', sportId: 17, start: t1, tournament: 'Demo Masters', names: [['MOUZ'], ['The MongolZ', 'MongolZ']], title: 'MOUZ vs The MongolZ' },
+      { id: 'id17demo2', sportId: 17, start: t2, tournament: 'Demo League', names: [['Eyeballers'], ['IC Prospects']], title: 'Eyeballers vs IC Prospects' },
+    ],
+    dota2: [{ id: 'id16demo1', sportId: 16, start: t3, tournament: 'Demo Cup', names: [['Team Spirit'], ['Gaimin Gladiators']], title: 'Team Spirit vs Gaimin Gladiators' }],
+  };
+  // marketId -> { t: type, p: period, h: handicap, o: [[outcomeId, name], ...] }
+  const markets = {
+    171: { t: 'moneyline', p: 'result', h: 0, o: [[171, '1'], [172, '2']] },
+    173: { t: 'moneyline', p: 'p1', h: 0, o: [[173, '1'], [174, '2']] },
+    175: { t: 'moneyline', p: 'p2', h: 0, o: [[175, '1'], [176, '2']] },
+    177: { t: 'spreads', p: 'result', h: -1.5, o: [[177, '1'], [178, '2']] },
+    179: { t: 'spreads', p: 'result', h: 1.5, o: [[179, '1'], [180, '2']] },
+    181: { t: 'totals', p: 'result', h: 2.5, o: [[181, 'Over'], [182, 'Under']] },
+    161: { t: 'moneyline', p: 'result', h: 0, o: [[161, '1'], [162, '2']] },
+  };
+  // participant 1 = MOUZ (swapped vs Polymarket order)
+  const odds = {
+    id17demo1: papiOdds('id17demo1', {
+      pinnacle: { 171: [[171, 1.58], [172, 2.55]], 177: [[177, 2.62, 'home/-1.5'], [178, 1.49, 'away/+1.5']], 181: [[181, 2.12], [182, 1.71]] },
+      winline: { 171: [[171, 1.60], [172, 2.50]], 177: [[177, 2.95, 'home/-1.5'], [178, 1.47]], 173: [[173, 1.62], [174, 2.30]] },
+      betboom: { 171: [[171, 1.58], [172, 2.48]], 173: [[173, 1.75], [174, 2.10]] },
+      thunderpick: { 171: [[171, 1.57], [172, 2.55]], 181: [[181, 2.20], [182, 1.68]] },
+    }),
+    id17demo2: papiOdds('id17demo2', {
+      betboom: { 171: [[171, 1.70], [172, 2.10]], 175: [[175, 1.12], [176, 6.30]] },
+      pinnacle: { 171: [[171, 1.80], [172, 2.04]], 175: [[175, 1.17], [176, 5.10]] },
+    }),
+    id16demo1: papiOdds('id16demo1', { pinnacle: { 161: [[161, 1.62], [162, 2.35]] } }),
+  };
+  return { gamma, fixtures, markets, odds };
 }

@@ -9,7 +9,13 @@
 //   Exchange with commission c:          q = 1 / (1 + (o - 1) * (1 - c))
 // An arbitrage is a partition of outcomes into blocks, one quote per block, with sum(q) < 1.
 
-export const polyCost = (ask, feePct = 0) => ask * (1 + feePct / 100);
+/**
+ * Polymarket taker fee as a fraction of cost: rate * (p * (1 - p)) ^ exponent
+ * (feeSchedule from Gamma, e.g. sports_fees_v3 = { rate: 0.05, exponent: 1 } → 1.25% at p = 0.5).
+ */
+export const polyFeeRate = (ask, sched) =>
+  sched && sched.rate ? sched.rate * Math.pow(ask * (1 - ask), sched.exponent ?? 1) : 0;
+export const polyCost = (ask, extraPct = 0, sched = null) => ask * (1 + polyFeeRate(ask, sched) + extraPct / 100);
 export const bookCost = (odds, commissionPct = 0) => 1 / (1 + (odds - 1) * (1 - commissionPct / 100));
 
 /** All set partitions of [0..n-1]. n is tiny (2 or 3). */

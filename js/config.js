@@ -1,31 +1,55 @@
-// Sport mapping: Polymarket tag slug  <->  The Odds API sport key.
+// Sport mapping.
+//  kind 'classic': Polymarket series  <->  The Odds API sport key (moneyline / 1X2).
+//  kind 'esports': Polymarket series  <->  OddsPapi sportId (match, map winners, handicaps, totals).
+// series = Polymarket Gamma series_id (see https://gamma-api.polymarket.com/sports).
 // outcomes: 2 = moneyline (no draw), 3 = 1X2 (home / draw / away).
 // Everything here can be overridden from the "Advanced" settings panel.
 export const DEFAULT_SPORTS = [
-  { id: 'nba',        label: 'NBA',               poly: 'nba',        odds: 'basketball_nba',              outcomes: 2 },
-  { id: 'nfl',        label: 'NFL',               poly: 'nfl',        odds: 'americanfootball_nfl',        outcomes: 2 },
-  { id: 'nhl',        label: 'NHL',               poly: 'nhl',        odds: 'icehockey_nhl',               outcomes: 2 },
-  { id: 'mlb',        label: 'MLB',               poly: 'mlb',        odds: 'baseball_mlb',                outcomes: 2 },
-  { id: 'cfb',        label: 'NCAA Football',     poly: 'cfb',        odds: 'americanfootball_ncaaf',      outcomes: 2 },
-  { id: 'cbb',        label: 'NCAA Basketball',   poly: 'cbb',        odds: 'basketball_ncaab',            outcomes: 2 },
-  { id: 'ufc',        label: 'UFC / MMA',         poly: 'ufc',        odds: 'mma_mixed_martial_arts',      outcomes: 2 },
-  { id: 'epl',        label: 'Premier League',    poly: 'epl',        odds: 'soccer_epl',                  outcomes: 3 },
-  { id: 'laliga',     label: 'La Liga',           poly: 'la-liga',    odds: 'soccer_spain_la_liga',        outcomes: 3 },
-  { id: 'seriea',     label: 'Serie A',           poly: 'serie-a',    odds: 'soccer_italy_serie_a',        outcomes: 3 },
-  { id: 'bundesliga', label: 'Bundesliga',        poly: 'bundesliga', odds: 'soccer_germany_bundesliga',   outcomes: 3 },
-  { id: 'ligue1',     label: 'Ligue 1',           poly: 'ligue-1',    odds: 'soccer_france_ligue_one',     outcomes: 3 },
-  { id: 'ucl',        label: 'Champions League',  poly: 'ucl',        odds: 'soccer_uefa_champs_league',   outcomes: 3 },
-  { id: 'mls',        label: 'MLS',               poly: 'mls',        odds: 'soccer_usa_mls',              outcomes: 3 },
+  { id: 'cs2',        label: 'Counter-Strike',    kind: 'esports', series: 10310, papi: 17 },
+  { id: 'dota2',      label: 'Dota 2',            kind: 'esports', series: 10309, papi: 16 },
+  { id: 'lol',        label: 'League of Legends', kind: 'esports', series: 10311, papi: 18 },
+  { id: 'val',        label: 'Valorant',          kind: 'esports', series: 10369, papi: 61 },
+  { id: 'cod',        label: 'Call of Duty',      kind: 'esports', series: 10427, papi: 56 },
+  { id: 'r6',         label: 'Rainbow Six',       kind: 'esports', series: 10432, papi: 58 },
+  { id: 'hok',        label: 'Honor of Kings',    kind: 'esports', series: 10434, papi: 65 },
+  { id: 'mlbb',       label: 'Mobile Legends',    kind: 'esports', series: 10426, papi: 83 },
+  { id: 'nba',        label: 'NBA',               kind: 'classic', series: 10345, odds: 'basketball_nba',            outcomes: 2 },
+  { id: 'nfl',        label: 'NFL',               kind: 'classic', series: 12185, odds: 'americanfootball_nfl',      outcomes: 2 },
+  { id: 'nhl',        label: 'NHL',               kind: 'classic', series: 10346, odds: 'icehockey_nhl',             outcomes: 2 },
+  { id: 'mlb',        label: 'MLB',               kind: 'classic', series: 3,     odds: 'baseball_mlb',              outcomes: 2 },
+  { id: 'cfb',        label: 'NCAA Football',     kind: 'classic', series: 12756, odds: 'americanfootball_ncaaf',    outcomes: 2 },
+  { id: 'cbb',        label: 'NCAA Basketball',   kind: 'classic', series: 10470, odds: 'basketball_ncaab',          outcomes: 2 },
+  { id: 'ufc',        label: 'UFC / MMA',         kind: 'classic', series: 38,    odds: 'mma_mixed_martial_arts',    outcomes: 2 },
+  { id: 'epl',        label: 'Premier League',    kind: 'classic', series: 10188, odds: 'soccer_epl',                outcomes: 3 },
+  { id: 'laliga',     label: 'La Liga',           kind: 'classic', series: 10193, odds: 'soccer_spain_la_liga',      outcomes: 3 },
+  { id: 'seriea',     label: 'Serie A',           kind: 'classic', series: 10203, odds: 'soccer_italy_serie_a',      outcomes: 3 },
+  { id: 'bundesliga', label: 'Bundesliga',        kind: 'classic', series: 10194, odds: 'soccer_germany_bundesliga', outcomes: 3 },
+  { id: 'ligue1',     label: 'Ligue 1',           kind: 'classic', series: 10195, odds: 'soccer_france_ligue_one',   outcomes: 3 },
+  { id: 'ucl',        label: 'Champions League',  kind: 'classic', series: 10204, odds: 'soccer_uefa_champs_league', outcomes: 3 },
+  { id: 'mls',        label: 'MLS',               kind: 'classic', series: 10189, odds: 'soccer_usa_mls',            outcomes: 3 },
 ];
 
 export const DEFAULT_SETTINGS = {
   oddsApiKey: '',
   regions: 'eu,uk',
   bookmakers: '',            // comma-separated bookmaker keys whitelist, empty = all
-  sports: ['nba', 'nfl', 'nhl', 'epl'],
+  oddspapiKey: '',
+  oddspapiBooks: '',         // OddsPapi bookmaker slugs, empty = all on your plan
+  oddspapiMaxFixtures: 15,   // OddsPapi requests per esport per scan (1 request = 1 match)
+  scanHours: 48,             // look this many hours ahead
+  sports: ['cs2', 'dota2', 'lol', 'val', 'nba', 'epl'],
+  minOdds: 1.01,
+  maxOdds: 100,
+  maxProfit: 25,             // above this an arb is almost always a matching / line error — flagged
+  search: '',
+  sortBy: 'profit',          // profit | time
+  currency: 'USD',
+  rubRate: 0,                // 0 = do not show RUB
+  roundTo: 1,                // round bookmaker stakes to
+  theme: 'dark',
   minProfit: 0.5,            // %
   minLiquidity: 0,           // $ available on Polymarket at arb price
-  polyFee: 0,                // % taker fee added to Polymarket cost
+  polyFee: 0,                // extra % on top of Polymarket's own fee schedule (applied automatically)
   exchangeCommission: 2,     // % commission on winnings for exchanges (betfair_ex_*, matchbook, smarkets)
   bankroll: 1000,
   timeTolerance: 6,          // hours between Polymarket and bookmaker start times
@@ -40,7 +64,7 @@ export const DEFAULT_SETTINGS = {
   sportsOverride: '',        // JSON array overriding DEFAULT_SPORTS
 };
 
-export const EXCHANGE_KEYS = /(^|_)(betfair_ex|matchbook|smarkets|betdaq)/i;
+export const EXCHANGE_KEYS = /(^|[_-])(betfair[_-]?ex|matchbook|smarkets|betdaq|orbitexch|sx\.?bet|prophetx)/i;
 
 // Known aliases (normalized form -> canonical normalized form).
 export const ALIASES = {

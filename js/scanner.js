@@ -10,12 +10,12 @@ export function buildQuotes(poly, odds, bookNames, s) {
   const quotes = [];
   poly.outcomes.forEach((o, i) => {
     if (o.yes?.ask > 0 && o.yes.ask < 1) quotes.push({
-      set: [i], q: polyCost(o.yes.ask, s.polyFee), src: 'poly', book: 'Polymarket', bookKey: 'polymarket',
-      side: 'YES', price: o.yes.ask, token: o.yes.token, label: o.name, url: poly.url,
+      set: [i], q: polyCost(o.yes.ask, s.polyFee, o.yes.fee), src: 'poly', book: 'Polymarket', bookKey: 'polymarket',
+      side: 'YES', price: o.yes.ask, token: o.yes.token, fee: o.yes.fee, label: o.name, url: poly.url,
     });
     if (n > 2 && o.no?.ask > 0 && o.no.ask < 1) quotes.push({
-      set: all.filter(j => j !== i), q: polyCost(o.no.ask, s.polyFee), src: 'poly', book: 'Polymarket', bookKey: 'polymarket',
-      side: 'NO', price: o.no.ask, token: o.no.token, label: `НЕ ${o.name}`, url: poly.url,
+      set: all.filter(j => j !== i), q: polyCost(o.no.ask, s.polyFee, o.no.fee), src: 'poly', book: 'Polymarket', bookKey: 'polymarket',
+      side: 'NO', price: o.no.ask, token: o.no.token, fee: o.no.fee, label: `НЕ ${o.name}`, url: poly.url,
     });
   });
   for (const b of odds.books) {
@@ -54,7 +54,7 @@ export function applyDepth(arb, books, s) {
     const asks = leg.src === 'poly' && books.get(leg.token);
     if (!asks) continue;
     const bestAsk = Math.min(...asks.map(a => +a.price));
-    if (isFinite(bestAsk)) { leg.price = bestAsk; leg.q = polyCost(bestAsk, s.polyFee); }
+    if (isFinite(bestAsk)) { leg.price = bestAsk; leg.q = polyCost(bestAsk, s.polyFee, leg.fee); }
     else leg.q = 1; // empty book: nothing to buy
   }
   arb.sum = arb.legs.reduce((a, l) => a + l.q, 0);
@@ -64,8 +64,9 @@ export function applyDepth(arb, books, s) {
     const asks = leg.src === 'poly' && books.get(leg.token);
     if (!asks) continue;
     const others = arb.sum - leg.q;
-    leg.depth = bookDepth(asks, others, s.polyFee, s.minProfit);
-    maxBank = Math.min(maxBank, maxBankrollFromLeg(arb, leg, leg.depth.usd * (1 + s.polyFee / 100)));
+    const feePct = (leg.q / leg.price - 1) * 100; // effective fee at the touch
+    leg.depth = bookDepth(asks, others, feePct, s.minProfit);
+    maxBank = Math.min(maxBank, maxBankrollFromLeg(arb, leg, leg.depth.usd * (1 + feePct / 100)));
   }
   arb.profitPct = (1 / arb.sum - 1) * 100;
   arb.maxBankroll = isFinite(maxBank) ? maxBank : null;

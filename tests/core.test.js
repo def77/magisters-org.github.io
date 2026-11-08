@@ -68,7 +68,7 @@ test('end-to-end on demo data', () => {
   assert.ok(titles.has('Lakers vs. Celtics'));
   assert.ok(titles.has('Arsenal vs. Chelsea'));
   assert.ok(!titles.has('Warriors vs. Nuggets'));
-  const books = demoBooks(arbs.flatMap(a => a.legs.map(l => l.token)), poly);
+  const books = demoBooks(arbs.flatMap(a => a.legs.map(l => l.token)), poly.flatMap(g => g.outcomes.flatMap(o => [o.yes, o.no].filter(Boolean))));
   for (const a of arbs) {
     applyDepth(a, books, s);
     assert.ok(a.maxBankroll > 0);
@@ -76,7 +76,7 @@ test('end-to-end on demo data', () => {
 });
 
 test('gamma parser: moneyline without sportsMarketType, skips futures', () => {
-  const sp = DEFAULT_SPORTS[0];
+  const sp = DEFAULT_SPORTS.find(x => x.id === 'nba');
   const g = parsePolyEvent({
     id: 1, slug: 'nba-a-b-2026-11-08', title: 'A vs. B',
     markets: [
@@ -99,4 +99,82 @@ test('findMatch respects time window', () => {
   const ev = { start: new Date(t.getTime() + 24 * 3600e3), outcomeNames: ['Los Angeles Lakers', 'Boston Celtics'] };
   assert.equal(findMatch(pg, [ev], { timeTolerance: 6 }), null);
   assert.ok(findMatch(pg, [{ ...ev, start: t }], { timeTolerance: 6 }));
+});
+
+import { parseGammaEsports, matchFixture, oddsPapiLines, esportsArbs, hcpForParticipant1, outcomeLabel } from '../js/esports.js';
+import { demoEsports } from '../js/demo.js';
+import { polyCost, polyFeeRate } from '../js/arb.js';
+
+test('polymarket fee schedule', () => {
+  const sched = { rate: 0.05, exponent: 1 };
+  assert.ok(Math.abs(polyFeeRate(0.5, sched) - 0.0125) < 1e-12);
+  assert.ok(Math.abs(polyCost(0.5, 0, sched) - 0.50625) < 1e-12);
+  assert.equal(polyCost(0.5, 0, null), 0.5);
+});
+
+test('Sunderland is not an "under" market (regression)', () => {
+  const sp = { id: 'epl', outcomes: 3 };
+  const mk = (name, ask, bid) => ({ id: name, question: name === 'Draw' ? 'Will Sunderland AFC vs. Chelsea FC end in a draw?' : `Will ${name} win on 2026-11-08?`,
+    sportsMarketType: 'moneyline', groupItemTitle: name === 'Draw' ? 'Draw (Sunderland AFC vs. Chelsea FC)' : name,
+    outcomes: '["Yes","No"]', clobTokenIds: '["y","n"]', bestAsk: ask, bestBid: bid });
+  const g = parsePolyEvent({ id: 1, slug: 'epl-sun-che-2026-11-08', title: 'Sunderland AFC vs. Chelsea FC',
+    markets: [mk('Sunderland AFC', 0.2, 0.19), mk('Draw', 0.25, 0.24), mk('Chelsea FC', 0.57, 0.56)] }, sp);
+  assert.ok(g, 'parsed');
+  assert.deepEqual(g.outcomes.map(o => o.name), ['Sunderland AFC', 'Draw', 'Chelsea FC']);
+});
+
+test('esports: gamma markets normalised to team order', () => {
+  const d = demoEsports();
+  const g = parseGammaEsports(d.gamma.cs2[0], { id: 'cs2' });
+  assert.deepEqual(g.teams, ['TheMongolz', 'MOUZ']);
+  const hcp = g.markets.find(m => m.type === 'hcp');
+  assert.equal(hcp.key, 'hcp|result|1.5'); // MOUZ -1.5 => TheMongolz +1.5
+  assert.ok(Math.abs(hcp.legs[0].ask - 0.64) < 1e-9 && hcp.legs[1].ask === 0.37);
+  assert.ok(g.markets.some(m => m.key === 'ml|p1|0'));
+  assert.ok(g.markets.some(m => m.key === 'total|result|2.5'));
+});
+
+test('esports: fixture matching detects swapped teams', () => {
+  const d = demoEsports();
+  const g = parseGammaEsports(d.gamma.cs2[0], { id: 'cs2' });
+  const m = matchFixture(g, d.fixtures.cs2, { threshold: 0.62, timeTolerance: 6 });
+  assert.equal(m.fixture.id, 'id17demo1');
+  assert.equal(m.swap, true);
+});
+
+test('esports: oddspapi handicap sign follows participant 1 and the swap', () => {
+  assert.equal(hcpForParticipant1(-1.5, 'home/-1.5'), -1.5);
+  assert.equal(hcpForParticipant1(-1.5, 'home/+1.5'), 1.5);
+  assert.equal(hcpForParticipant1(-1.5, '1628099962'), -1.5);
+  const d = demoEsports();
+  const lines = oddsPapiLines(d.odds.id17demo1, d.markets, true, {});
+  const h = lines.get('hcp|result|1.5');
+  assert.ok(h, 'swapped handicap key exists');
+  // outcome 0 = TheMongolz +1.5 (participant 2 at OddsPapi)
+  assert.deepEqual(h.quotes[0].map(q => q.price), [1.49, 1.47]);
+  assert.deepEqual(h.quotes[1].map(q => q.price).sort(), [2.62, 2.95]);
+  assert.equal(outcomeLabel('hcp', 1.5, 0), 'Ф1(+1.5)');
+  assert.equal(outcomeLabel('hcp', 1.5, 1), 'Ф2(-1.5)');
+});
+
+test('esports: arbs on demo data', () => {
+  const s = { ...DEFAULT_SETTINGS, minProfit: 0.1 };
+  const d = demoEsports();
+  const g = parseGammaEsports(d.gamma.cs2[0], { id: 'cs2' });
+  const lines = oddsPapiLines(d.odds.id17demo1, d.markets, true, s);
+  const { arbs, compared } = esportsArbs(g, lines, s);
+  const keys = arbs.map(a => a.market.key);
+  assert.ok(keys.includes('ml|result|0'));
+  assert.ok(keys.includes('hcp|result|1.5'));
+  assert.ok(keys.includes('ml|p1|0'));
+  assert.ok(compared.length >= 4);
+  for (const a of arbs) {
+    assert.ok(a.legs.some(l => l.src === 'poly') && a.legs.some(l => l.src === 'book'));
+    assert.ok(new Set(a.legs.map(l => l.set[0])).size === 2, 'legs cover both outcomes');
+  }
+  const ml = arbs.find(a => a.market.key === 'ml|result|0');
+  const poly = ml.legs.find(l => l.src === 'poly'), book = ml.legs.find(l => l.src === 'book');
+  assert.equal(poly.label, 'П1 (матч)'); // TheMongolz on Polymarket
+  assert.equal(book.label, 'П2 (матч)'); // MOUZ at the bookmaker
+  assert.equal(book.book, 'Winline');
 });
