@@ -85,6 +85,7 @@ tr:last-child td { border-bottom: 0; }
 .src { display: inline-block; font-size: 11px; padding: 1px 6px; border-radius: 4px; font-weight: 600; }
 .src.poly { background: rgba(59, 130, 246, .15); color: var(--poly); }
 .src.book { background: rgba(245, 158, 11, .15); color: var(--book); }
+.src .crypto { font-weight: 700; opacity: .85; }
 :root[data-theme="dark"] .src.poly { color: #93c5fd; }
 :root[data-theme="dark"] .src.book { color: #fcd34d; }
 .tag { font-size: 10px; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; color: var(--muted); }

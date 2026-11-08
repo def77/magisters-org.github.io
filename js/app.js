@@ -8,8 +8,10 @@ import { valueBets, findMiddles, fairProbs } from './value.js';
 import { makerArbs, bo3Covers, polymarketInternal, isBo3 } from './structure.js';
 import { loadJournal, saveJournal, entryPnl, expectedPnl, journalStats, toCSV, legClv, closingFair } from './journal.js';
 import { demoData, demoBooks, demoEsports } from './demo.js';
+import { papiResultBooks, papiEvent, mergePapiEvent, isCryptoBook, cryptoSlugs } from './papiclassic.js';
 
 const $ = sel => document.querySelector(sel);
+const cryptoMark = l => (l.src === 'book' && isCryptoBook(l.bookKey) ? ' <span class="crypto" title="Крипто-бук">₿</span>' : '');
 const $$ = sel => [...document.querySelectorAll(sel)];
 const LS = 'polyarb.settings.v1';
 const SEEN = 'polyarb.alerted.v1';
@@ -48,7 +50,7 @@ function log(msg, level = 'info') {
 }
 
 /* ---------------- settings form ---------------- */
-const FIELDS = ['sharpBook', 'minEV', 'kellyFraction', 'valuePolyOnly', 'maxMiddleLoss', 'oddsApiKey', 'regions', 'bookmakers', 'oddspapiKey', 'oddspapiBooks', 'oddspapiMaxFixtures', 'scanHours',
+const FIELDS = ['papiClassic', 'sharpBook', 'minEV', 'kellyFraction', 'valuePolyOnly', 'maxMiddleLoss', 'oddsApiKey', 'regions', 'bookmakers', 'oddspapiKey', 'oddspapiBooks', 'oddspapiMaxFixtures', 'scanHours',
   'minProfit', 'maxProfit', 'minOdds', 'maxOdds', 'maxQuoteAgeMin', 'minLiquidity', 'polyFee', 'exchangeCommission', 'bankroll', 'roundTo', 'rubRate',
   'timeTolerance', 'matchThreshold', 'refreshSec', 'includeBookOnly', 'useOrderBook', 'corsProxy',
   'tgToken', 'tgChat', 'browserNotify', 'sportsOverride', 'search'];
@@ -110,7 +112,7 @@ async function runScan({ demo = false } = {}) {
   if (!demo && ((needClassicKey && !S.oddsApiKey) || (needPapiKey && !S.oddspapiKey))) {
     if (!S.oddsApiKey && !S.oddspapiKey) { log('Нет ни одного ключа — запускаю демо-режим.', 'warn'); demo = true; }
     else {
-      if (needClassicKey && !S.oddsApiKey) log('Нет ключа The Odds API — классический спорт без букмекеров.', 'warn');
+      if (needClassicKey && !S.oddsApiKey) log(S.papiClassic && S.oddspapiKey ? 'Нет ключа The Odds API — классика только по букам OddsPapi.' : 'Нет ключа The Odds API — классический спорт без букмекеров.', 'warn');
       if (needPapiKey && !S.oddspapiKey) log('Нет ключа OddsPapi — киберспорт без букмекеров.', 'warn');
     }
   }
@@ -189,6 +191,7 @@ async function scanClassic(list, demo) {
       if (o.status === 'fulfilled') { oddsBySport[sp.id] = o.value.events; if (o.value.remaining) state.credits = o.value.remaining; }
       else log(`Букмекеры ${sp.label}: ${o.reason.message}`, 'error');
     }));
+    if (S.papiClassic && S.oddspapiKey) await addPapiClassic(list, polyGames, oddsBySport);
   }
   const res = scan(polyGames, oddsBySport, S);
   const arbs = res.matches.flatMap(m => m.arbs.map(a => ({
@@ -212,6 +215,54 @@ async function scanClassic(list, demo) {
     if (f) fair.set(m.poly.id, new Map([['match', f.probs]]));
   }
   return { arbs, makers, covers, fair, values, overview, unmatched: res.unmatched.map(g => ({ title: g.title, url: g.url, sport: g.sport, teams: g.outcomes.map(o => o.name) })), polyLegs };
+}
+
+/** Classic sports: add match-result books from OddsPapi (crypto books like Stake) to the event pool. */
+async function addPapiClassic(list, polyGames, oddsBySport) {
+  const withPapi = list.filter(sp => sp.papi && polyGames.some(g => g.sport === sp.id));
+  if (!withPapi.length) return;
+  const papi = new OddsPapi(S.oddspapiKey, { proxy: S.corsProxy, log });
+  let map;
+  try { map = await papi.markets([...new Set(withPapi.map(sp => sp.papi))]); }
+  catch (e) { return log('OddsPapi рынки (классика): ' + e.message, 'error'); }
+  const fixturesBySport = new Map();
+  const opts = { threshold: S.matchThreshold, timeTolerance: S.timeTolerance };
+  outer: for (const sp of withPapi) {
+    let fixtures = fixturesBySport.get(sp.papi);
+    if (!fixtures) {
+      try { fixtures = await papi.fixtures(sp.papi, S.scanHours); }
+      catch (e) { log(`OddsPapi ${sp.label}: ${e.message}`, 'error'); if (e.status === 401 || e.status === 403 || e.status === 429) break; continue; }
+      fixturesBySport.set(sp.papi, fixtures);
+    }
+    const pairs = [], used = new Set();
+    for (const g of polyGames.filter(x => x.sport === sp.id)) {
+      const teams = g.outcomes.map(o => o.name).filter(n => !/^(draw|tie)$/i.test(n));
+      if (teams.length !== 2) continue;
+      const m = matchFixture({ teams, start: g.start }, fixtures, opts);
+      if (!m || used.has(m.fixture.id)) continue;
+      used.add(m.fixture.id);
+      pairs.push({ game: g, fixture: m.fixture });
+    }
+    pairs.sort((a, b) => (a.game.start || 0) - (b.game.start || 0));
+    const limit = Math.max(1, S.oddspapiMaxFixtures | 0);
+    if (pairs.length > limit) log(`${sp.label} (OddsPapi): сопоставлено ${pairs.length}, коэффициенты беру для ближайших ${limit}`, 'warn');
+    const pool = oddsBySport[sp.id] || (oddsBySport[sp.id] = []);
+    let added = 0;
+    const crypto = new Set();
+    for (const p of pairs.slice(0, limit)) {
+      let odds;
+      try { odds = await papi.odds(p.fixture.id, S.oddspapiBooks); }
+      catch (e) { log(`OddsPapi ${p.fixture.title}: ${e.message}`, 'error'); if (e.status === 401 || e.status === 403 || e.status === 429) break outer; continue; }
+      const f = p.fixture;
+      const books = papiResultBooks(odds, map, sp.outcomes, [f.names[0][0], f.names[1][0]], S);
+      if (!books.length) continue;
+      books.forEach(b => isCryptoBook(b.key) && crypto.add(b.title));
+      mergePapiEvent(pool, papiEvent(f, books, sp.outcomes), opts);
+      added++;
+    }
+    log(`OddsPapi ${sp.label}: исход матча для ${added} из ${pairs.length} матчей` + (crypto.size ? ` · крипто-буки: ${[...crypto].join(', ')}` : ''));
+  }
+  log(`OddsPapi (классика): потрачено запросов за скан — ${papi.used}`);
 }
 
 async function scanEsports(list, demo) {
@@ -414,7 +465,7 @@ function renderArbs(arbs, sel = '#arbBody', emptyText = 'Вилок по фил�
       <td class="c-event"><div class="ev">${esc(m.title)}</div><div class="sub">${esc(sportLabel(m.sport))} · ${fmtTime(m.start)}</div>
         <div class="sub dim">${esc(m.other)} · совпадение ${(m.score * 100).toFixed(0)}%</div></td>
       <td class="c-bets" data-label="Ставки">${a.legs.map(l => `<div class="leg"><span class="lbl">${esc(l.label)}</span>${l.team && l.team !== l.label ? ` <span class="sub">${esc(l.team)}</span>` : ''}</div>`).join('')}</td>
-      <td class="c-books" data-label="Где">${a.legs.map(l => `<div class="leg"><span class="src ${l.src}">${esc(l.book)}</span> <span class="m-only lbl">${esc(l.label)}${l.team && l.team !== l.label ? ' ' + esc(l.team) : ''}</span> <b>${fmtPrice(l)}</b>${l.limit ? ` <span class="sub">лим ${Math.round(l.limit)}</span>` : ''}${freshness(l)}</div>`).join('')}</td>
+      <td class="c-books" data-label="Где">${a.legs.map(l => `<div class="leg"><span class="src ${l.src}">${esc(l.book)}${cryptoMark(l)}</span> <span class="m-only lbl">${esc(l.label)}${l.team && l.team !== l.label ? ' ' + esc(l.team) : ''}</span> <b>${fmtPrice(l)}</b>${l.limit ? ` <span class="sub">лим ${Math.round(l.limit)}</span>` : ''}${freshness(l)}</div>`).join('')}</td>
       <td class="nowrap c-limit" data-label="Лимит">${a.maxBankroll != null ? money(a.maxBankroll) : '—'}</td>
       <td class="nowrap actions-cell">
         <a class="ghost small btn" href="${m.url}" target="_blank" rel="noopener" title="Открыть на Polymarket">Poly</a>
@@ -445,7 +496,7 @@ function renderValues() {
       <td class="nowrap"><span class="profit ${v.evPct >= 5 ? 'hot' : ''} ${v.evPct > S.maxProfit ? 'sus' : ''}">+${v.evPct.toFixed(2)}%</span></td>
       <td><div class="ev">${esc(m.title)}</div><div class="sub">${esc(sportLabel(m.sport))} · ${fmtTime(m.start)}</div></td>
       <td><div class="leg"><span class="lbl">${esc(l.label)}</span>${l.team && l.team !== l.label ? ` <span class="sub">${esc(l.team)}</span>` : ''}</div>
-        <div class="leg"><span class="src ${l.src}">${esc(l.book)}</span> <b>${fmtPrice(l)}</b>${freshness(l)}</div></td>
+        <div class="leg"><span class="src ${l.src}">${esc(l.book)}${cryptoMark(l)}</span> <b>${fmtPrice(l)}</b>${freshness(l)}</div></td>
       <td class="nowrap">${v.fairOdds.toFixed(2)}<div class="sub">${(v.p * 100).toFixed(1)}% · маржа ${esc(S.sharpBook)} ${(v.sharpMargin * 100).toFixed(1)}%</div></td>
       <td class="nowrap"><b>${money(v.stake)}</b><div class="sub">${(v.kelly * S.kellyFraction * 100).toFixed(1)}% банка</div></td>
       <td class="nowrap actions-cell"><a class="ghost small btn" href="${l.src === 'poly' ? m.url : esc(l.url || m.url)}" target="_blank" rel="noopener">${l.src === 'poly' ? 'Poly' : 'БК'}</a>
@@ -465,7 +516,7 @@ function renderMiddles() {
         <div class="sub">коридор +${x.bothPct.toFixed(0)}%</div></td>
       <td><div class="ev">${esc(m.title)}</div><div class="sub">${esc(sportLabel(m.sport))} · ${fmtTime(m.start)} · ${esc(what)}</div></td>
       <td>${x.legs.map(l => `<div class="leg"><span class="lbl">${esc(l.label)}</span>${l.team ? ` <span class="sub">${esc(l.team)}</span>` : ''}</div>`).join('')}</td>
-      <td>${x.legs.map((l, i) => `<div class="leg"><span class="src ${l.src}">${esc(l.book)}</span> <b>${fmtPrice(l)}</b> · ${money(bank * (i ? x.share2 : x.share1))}${freshness(l)}</div>`).join('')}</td>
+      <td>${x.legs.map((l, i) => `<div class="leg"><span class="src ${l.src}">${esc(l.book)}${cryptoMark(l)}</span> <b>${fmtPrice(l)}</b> · ${money(bank * (i ? x.share2 : x.share1))}${freshness(l)}</div>`).join('')}</td>
       <td class="nowrap"><a class="ghost small btn" href="${m.url}" target="_blank" rel="noopener">Poly</a></td></tr>`;
   }).join('');
 }
@@ -481,7 +532,7 @@ function renderOverview() {
       <td>${o.lines.length ? o.lines.sort((a, b) => a.sum - b.sum).slice(0, 6).map(l => {
         const margin = (l.sum - 1) * 100;
         return `<div class="leg"><span class="${margin < 0 ? 'pos' : 'neg'}">${margin < 0 ? '+' + (-margin).toFixed(2) + '%' : '−' + margin.toFixed(2) + '%'}</span>
-          ${l.legs.map(x => `<span class="src ${x.src}">${esc(x.book)}</span> ${esc(x.label)} ${fmtPrice(x)}`).join(' · ')}</div>`;
+          ${l.legs.map(x => `<span class="src ${x.src}">${esc(x.book)}${cryptoMark(x)}</span> ${esc(x.label)} ${fmtPrice(x)}`).join(' · ')}</div>`;
       }).join('') : '<span class="sub">общих рынков не найдено</span>'}</td>
       <td class="nowrap">${o.books}</td></tr>`).join('');
 }
@@ -541,7 +592,7 @@ function renderCalc() {
     const feePct = l.src === 'poly' ? polyFeeRate(+calc.prices[i] || l.price, l.fee) * 100 + S.polyFee : 0;
     return `<div class="calc-leg">
       <div class="cl-name"><b>${esc(l.label)}</b> <span class="sub">${esc(l.team && l.team !== l.label ? l.team : '')}</span></div>
-      <span class="src ${l.src}">${esc(l.book)}</span>
+      <span class="src ${l.src}">${esc(l.book)}${cryptoMark(l)}</span>
       <label>${l.src === 'poly' ? 'Цена' : 'Кэф'} <input data-price="${i}" type="number" step="${l.src === 'poly' ? '0.001' : '0.01'}" value="${(+calc.prices[i]).toFixed(l.src === 'poly' ? 3 : 2)}"></label>
       <label>Ставка $ <input data-stake="${i}" type="number" step="1" value="${n.stakes[i].toFixed(2)}"></label>
       <div class="cl-out">${l.src === 'poly' ? `${(n.stakes[i] / (+calc.prices[i] * (1 + feePct / 100))).toFixed(1)} акций · комиссия ${feePct.toFixed(2)}%` : `выплата ${money(n.payouts[i])}`}
@@ -712,6 +763,24 @@ document.addEventListener('DOMContentLoaded', () => {
       log(`OddsPapi: ключ работает. ${sub?.request_count != null ? `Использовано ${sub.request_count} из ${sub.request_limit}` : JSON.stringify(acc).slice(0, 200)}`, 'ok');
       const books = await p.bookmakers();
       log(`OddsPapi: доступно букмекеров — ${books.length}: ${books.slice(0, 40).map(b => b.slug).join(', ')}${books.length > 40 ? '…' : ''}`);
+      const cs = cryptoSlugs(books);
+      log(cs.length ? `OddsPapi: крипто-буки в тарифе — ${cs.join(', ')}` : 'OddsPapi: крипто-буков в тарифе не найдено', cs.length ? 'ok' : 'warn');
+    } catch (e) { log(e.message, 'error'); }
+  });
+  $('#papiCrypto').addEventListener('click', async () => {
+    readForm(); save();
+    if (!S.oddspapiKey) return log('Вставьте ключ OddsPapi', 'warn');
+    try {
+      const books = await new OddsPapi(S.oddspapiKey, { proxy: S.corsProxy }).bookmakers();
+      const cs = cryptoSlugs(books);
+      if (!cs.length) return log('OddsPapi: крипто-буков в тарифе не найдено — список не изменён', 'warn');
+      const sharp = (S.sharpBook || 'pinnacle').trim();
+      const keep = books.some(b => b.slug === sharp) ? [sharp] : [];
+      $('#oddspapiBooks').value = [...new Set([...keep, ...cs])].join(',');
+      $('#papiClassic').checked = true;
+      readForm(); save();
+      const want = ['stake', 'duel'].filter(w => !cs.some(c => c.toLowerCase().includes(w)));
+      log(`OddsPapi: оставлены крипто-буки${keep.length ? ` + ${sharp} (для валуек и CLV)` : ''}: ${cs.join(', ')}` + (want.length ? ` · нет в тарифе: ${want.join(', ')}` : ''), 'ok');
     } catch (e) { log(e.message, 'error'); }
   });
   $('#papiDiag').addEventListener('click', async () => {

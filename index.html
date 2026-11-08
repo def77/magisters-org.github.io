@@ -74,15 +74,16 @@
         </div>
         <label class="check"><input id="valuePolyOnly" type="checkbox"> Валуйки только на Polymarket</label>
 
-        <h3>OddsPapi (киберспорт)</h3>
+        <h3>OddsPapi (киберспорт и крипто-буки)</h3>
         <label>Ключ OddsPapi <input id="oddspapiKey" type="password" placeholder="oddspapi.io → Account" autocomplete="off"></label>
-        <div class="row"><button type="button" id="papiCheck" class="ghost small">Проверить ключ</button><button type="button" id="papiDiag" class="ghost small" title="Собрать отчёт о формате ответов OddsPapi, чтобы прислать разработчику">Диагностика</button></div>
+        <div class="row"><button type="button" id="papiCheck" class="ghost small">Проверить ключ</button><button type="button" id="papiCrypto" class="ghost small" title="Оставить в списке только крипто-буки из вашего тарифа (Stake, Duel, BC.Game…) и «острый» бук для валуек">Крипто-буки</button><button type="button" id="papiDiag" class="ghost small" title="Собрать отчёт о формате ответов OddsPapi, чтобы прислать разработчику">Диагностика</button></div>
         <div id="diagBox" class="hidden">
           <textarea id="diagText" rows="8" readonly></textarea>
           <div class="row"><button type="button" id="diagCopy" class="ghost small">Скопировать отчёт</button><span class="note">Ключа в отчёте нет. Тратит ~5 запросов.</span></div>
         </div>
         <label>Только эти буки (slug через запятую) <input id="oddspapiBooks" placeholder="пусто = все из тарифа"></label>
         <label>Матчей за скан на дисциплину <input id="oddspapiMaxFixtures" type="number" step="1" min="1" title="1 матч = 1 запрос к OddsPapi"></label>
+        <label class="check"><input id="papiClassic" type="checkbox"> Классика через OddsPapi (исход матча; там крипто-буки — The Odds API их не даёт). Тратит 1 запрос на лигу + 1 на матч</label>
 
         <h3>The Odds API (классика)</h3>
         <label>Ключ The Odds API <input id="oddsApiKey" type="password" placeholder="the-odds-api.com" autocomplete="off"></label>

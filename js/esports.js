@@ -141,8 +141,8 @@ export function hcpForParticipant1(h, bookLabel) {
   return +h;
 }
 
-const BOOK_NAMES = { pinnacle: 'Pinnacle', bet365: 'Bet365', '1xbet': '1xBet', ggbet: 'GG.bet', thunderpick: 'Thunderpick', stake: 'Stake', bcgame: 'BC.Game', vbet: 'VBET', betway: 'Betway', 'betfair-ex': 'Betfair Ex' };
-const prettyBook = slug => BOOK_NAMES[slug] || slug.replace(/[-_.]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+const BOOK_NAMES = { pinnacle: 'Pinnacle', bet365: 'Bet365', '1xbet': '1xBet', ggbet: 'GG.bet', thunderpick: 'Thunderpick', stake: 'Stake', bcgame: 'BC.Game', 'bc.game': 'BC.Game', duel: 'Duel', roobet: 'Roobet', rollbit: 'Rollbit', cloudbet: 'Cloudbet', 'sportsbet.io': 'Sportsbet.io', sportsbetio: 'Sportsbet.io', betfury: 'BetFury', shuffle: 'Shuffle', gamdom: 'Gamdom', '1xbit': '1xBit', vbet: 'VBET', betway: 'Betway', 'betfair-ex': 'Betfair Ex' };
+export const prettyBook = slug => BOOK_NAMES[slug] || slug.replace(/[-_.]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
 
 export function periodLabel(p) {
   if (p === 'result') return 'матч';

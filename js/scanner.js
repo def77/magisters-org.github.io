@@ -20,7 +20,7 @@ export function buildQuotes(poly, odds, bookNames, s) {
     });
   });
   for (const b of odds.books) {
-    if (whitelist && !whitelist.has(b.key)) continue;
+    if (whitelist && !b.papi && !whitelist.has(b.key)) continue; // OddsPapi books have their own whitelist
     if (isStale(b.updated, s.maxQuoteAgeMin)) continue;
     const comm = EXCHANGE_KEYS.test(b.key) ? s.exchangeCommission : 0;
     bookNames.forEach((name, i) => {
@@ -28,6 +28,7 @@ export function buildQuotes(poly, odds, bookNames, s) {
       if (o > 1) quotes.push({
         set: [i], q: bookCost(o, comm), src: 'book', book: b.title, bookKey: b.key,
         side: 'BACK', price: o, label: poly.outcomes[i].name, mkey: 'match', out: i, bookOutcome: name, updated: b.updated,
+        limit: b.limits?.[name] ?? null, url: b.url || null,
       });
     });
   }

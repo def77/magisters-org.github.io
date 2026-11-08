@@ -61,15 +61,16 @@ export class OddsPapi {
 
   /** marketId -> { type, period, handicap, outcomes:[{id,name}] } for the given sports. Cached 24h. */
   async markets(sportIds) {
-    const k = 'polyarb.papi.markets.v1';
+    const k = 'polyarb.papi.markets.v2';
     let d = cache.get(k, 24 * 3600e3);
     if (!d || sportIds.some(id => !d.sports.includes(id))) {
       const all = await this.get('markets');
-      const keep = new Set(sportIds);
+      // keep sports cached earlier too, so esports and classic scans do not evict each other
+      const keep = new Set([...sportIds, ...(d?.sports || [])]);
       const map = {};
       for (const m of unwrap(all) || []) {
         if (!keep.has(m.sportId) || m.playerProp) continue;
-        if (!['moneyline', 'spreads', 'totals'].includes(m.marketType)) continue;
+        if (!['moneyline', 'spreads', 'totals', '1x2'].includes(m.marketType)) continue;
         map[m.marketId] = { t: m.marketType, p: m.period, h: m.handicap, o: (m.outcomes || []).map(x => [x.outcomeId, x.outcomeName]) };
       }
       d = { sports: [...keep], map };

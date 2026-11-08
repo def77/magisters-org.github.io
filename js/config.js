@@ -1,6 +1,7 @@
 // Sport mapping.
 //  kind 'classic': Polymarket series  <->  The Odds API sport key (moneyline / 1X2).
 //  kind 'esports': Polymarket series  <->  OddsPapi sportId (match, map winners, handicaps, totals).
+//  papi on a classic sport: OddsPapi sportId for the match result (crypto books such as Stake), used with «Классика через OddsPapi».
 // series = Polymarket Gamma series_id (see https://gamma-api.polymarket.com/sports).
 // outcomes: 2 = moneyline (no draw), 3 = 1X2 (home / draw / away).
 // Everything here can be overridden from the "Advanced" settings panel.
@@ -13,20 +14,20 @@ export const DEFAULT_SPORTS = [
   { id: 'r6',         label: 'Rainbow Six',       kind: 'esports', series: 10432, papi: 58 },
   { id: 'hok',        label: 'Honor of Kings',    kind: 'esports', series: 10434, papi: 65 },
   { id: 'mlbb',       label: 'Mobile Legends',    kind: 'esports', series: 10426, papi: 83 },
-  { id: 'nba',        label: 'NBA',               kind: 'classic', series: 10345, odds: 'basketball_nba',            outcomes: 2 },
-  { id: 'nfl',        label: 'NFL',               kind: 'classic', series: 12185, odds: 'americanfootball_nfl',      outcomes: 2 },
-  { id: 'nhl',        label: 'NHL',               kind: 'classic', series: 10346, odds: 'icehockey_nhl',             outcomes: 2 },
-  { id: 'mlb',        label: 'MLB',               kind: 'classic', series: 3,     odds: 'baseball_mlb',              outcomes: 2 },
-  { id: 'cfb',        label: 'NCAA Football',     kind: 'classic', series: 12756, odds: 'americanfootball_ncaaf',    outcomes: 2 },
-  { id: 'cbb',        label: 'NCAA Basketball',   kind: 'classic', series: 10470, odds: 'basketball_ncaab',          outcomes: 2 },
+  { id: 'nba',        label: 'NBA',               kind: 'classic', series: 10345, odds: 'basketball_nba',            outcomes: 2, papi: 11 },
+  { id: 'nfl',        label: 'NFL',               kind: 'classic', series: 12185, odds: 'americanfootball_nfl',      outcomes: 2, papi: 14 },
+  { id: 'nhl',        label: 'NHL',               kind: 'classic', series: 10346, odds: 'icehockey_nhl',             outcomes: 2, papi: 15 },
+  { id: 'mlb',        label: 'MLB',               kind: 'classic', series: 3,     odds: 'baseball_mlb',              outcomes: 2, papi: 13 },
+  { id: 'cfb',        label: 'NCAA Football',     kind: 'classic', series: 12756, odds: 'americanfootball_ncaaf',    outcomes: 2, papi: 14 },
+  { id: 'cbb',        label: 'NCAA Basketball',   kind: 'classic', series: 10470, odds: 'basketball_ncaab',          outcomes: 2, papi: 11 },
   { id: 'ufc',        label: 'UFC / MMA',         kind: 'classic', series: 38,    odds: 'mma_mixed_martial_arts',    outcomes: 2 },
-  { id: 'epl',        label: 'Premier League',    kind: 'classic', series: 10188, odds: 'soccer_epl',                outcomes: 3 },
-  { id: 'laliga',     label: 'La Liga',           kind: 'classic', series: 10193, odds: 'soccer_spain_la_liga',      outcomes: 3 },
-  { id: 'seriea',     label: 'Serie A',           kind: 'classic', series: 10203, odds: 'soccer_italy_serie_a',      outcomes: 3 },
-  { id: 'bundesliga', label: 'Bundesliga',        kind: 'classic', series: 10194, odds: 'soccer_germany_bundesliga', outcomes: 3 },
-  { id: 'ligue1',     label: 'Ligue 1',           kind: 'classic', series: 10195, odds: 'soccer_france_ligue_one',   outcomes: 3 },
-  { id: 'ucl',        label: 'Champions League',  kind: 'classic', series: 10204, odds: 'soccer_uefa_champs_league', outcomes: 3 },
-  { id: 'mls',        label: 'MLS',               kind: 'classic', series: 10189, odds: 'soccer_usa_mls',            outcomes: 3 },
+  { id: 'epl',        label: 'Premier League',    kind: 'classic', series: 10188, odds: 'soccer_epl',                outcomes: 3, papi: 10 },
+  { id: 'laliga',     label: 'La Liga',           kind: 'classic', series: 10193, odds: 'soccer_spain_la_liga',      outcomes: 3, papi: 10 },
+  { id: 'seriea',     label: 'Serie A',           kind: 'classic', series: 10203, odds: 'soccer_italy_serie_a',      outcomes: 3, papi: 10 },
+  { id: 'bundesliga', label: 'Bundesliga',        kind: 'classic', series: 10194, odds: 'soccer_germany_bundesliga', outcomes: 3, papi: 10 },
+  { id: 'ligue1',     label: 'Ligue 1',           kind: 'classic', series: 10195, odds: 'soccer_france_ligue_one',   outcomes: 3, papi: 10 },
+  { id: 'ucl',        label: 'Champions League',  kind: 'classic', series: 10204, odds: 'soccer_uefa_champs_league', outcomes: 3, papi: 10 },
+  { id: 'mls',        label: 'MLS',               kind: 'classic', series: 10189, odds: 'soccer_usa_mls',            outcomes: 3, papi: 10 },
 ];
 
 export const DEFAULT_SETTINGS = {
@@ -36,6 +37,7 @@ export const DEFAULT_SETTINGS = {
   oddspapiKey: '',
   oddspapiBooks: '',         // OddsPapi bookmaker slugs, empty = all on your plan
   oddspapiMaxFixtures: 15,   // OddsPapi requests per esport per scan (1 request = 1 match)
+  papiClassic: false,        // classic sports: also take match result from OddsPapi (crypto books); costs requests
   scanHours: 48,             // look this many hours ahead
   sports: ['cs2', 'dota2', 'lol', 'val', 'nba', 'epl'],
   minOdds: 1.01,
