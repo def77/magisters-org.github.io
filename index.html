@@ -13,8 +13,10 @@
     <div class="brand">Вилки <b>Duel ↔ Polymarket</b> <span class="muted">киберспорт · прематч</span></div>
     <div class="top-actions">
       <span id="status" class="status">Готов</span>
-      <span id="credits" class="muted" title="Остаток кредитов DuelAPI"></span>
-      <button id="scanBtn" class="primary">Сканировать</button>
+      <span id="wsState" class="pill" hidden>Polymarket: подключение…</span>
+      <span id="credits" class="muted" title="Кредиты DuelAPI"></span>
+      <button id="scanBtn">Сканировать</button>
+      <button id="liveBtn" class="primary" title="Polymarket — мгновенно по WebSocket, Duel — по расписанию из настроек">Реал-тайм: выкл</button>
     </div>
   </header>
 
@@ -41,7 +43,13 @@
         <h3>Расход кредитов</h3>
         <label>Матчи в ближайшие, ч <input id="horizonH" type="number" min="1" step="1"></label>
         <label>Не больше матчей Duel за скан <input id="maxDuelEvents" type="number" min="1" step="1" title="Каждый матч — 5–10 кредитов"></label>
-        <label>Автоскан <select id="refreshMin"><option value="0">выкл.</option><option value="2">каждые 2 мин</option><option value="5">каждые 5 мин</option><option value="10">каждые 10 мин</option></select></label>
+      </section>
+      <section>
+        <h3>Реал-тайм</h3>
+        <label>Duel обновлять раз в, с <input id="duelSec" type="number" min="10" step="10" title="Обычные пары"></label>
+        <label>Близкие к вилке — раз в, с <input id="duelHotSec" type="number" min="5" step="5"></label>
+        <label>«Близко» — сумма ниже <input id="hotSum" type="number" min="1" step="0.005"></label>
+        <label>Искать новые матчи раз в, мин <input id="discoveryMin" type="number" min="2" step="1"></label>
         <p class="note" id="costNote"></p>
       </section>
     </aside>
@@ -65,7 +73,7 @@
       <section id="tab-all" class="panel hidden">
         <p class="note">Все пары «Polymarket + Duel» по общим рынкам, от лучшей суммы к худшей. Сумма &lt; 1 — вилка. Серым — отброшено (причина в последней колонке).</p>
         <table class="grid">
-          <thead><tr><th>Сумма</th><th>Матч</th><th>Рынок</th><th>Polymarket</th><th>Duel</th><th>Примечание</th></tr></thead>
+          <thead><tr><th>Сумма</th><th>Матч</th><th>Рынок</th><th>Polymarket</th><th>Duel</th><th>Примечание</th><th></th></tr></thead>
           <tbody id="allBody"></tbody>
         </table>
       </section>
@@ -81,6 +89,23 @@
 
       <section id="tab-log" class="panel hidden"><pre id="log"></pre></section>
     </main>
+  </div>
+
+  <div id="calc" class="calc" hidden>
+    <div class="calc-head"><b>Калькулятор</b><button id="calcClose" class="small">✕</button></div>
+    <div id="cTitle" class="sub"></div>
+    <div id="cSides" class="calc-sides"></div>
+    <div class="calc-in">
+      <label>Цена Polymarket <input id="cPrice" type="number" step="0.001" min="0" max="1"></label>
+      <label>Кэф Duel <input id="cOdds" type="number" step="0.01" min="1"></label>
+      <label>Считать от <select id="cMode"><option value="bank">общего банка</option><option value="poly">суммы на Polymarket</option><option value="duel">ставки на Duel</option></select></label>
+      <label>Сумма, $ <input id="cAmount" type="number" min="1" step="1"></label>
+      <label>Округлить ставку Duel до <select id="cRound"><option value="0">не округлять</option><option value="1">$1</option><option value="5">$5</option><option value="10">$10</option></select></label>
+      <button id="cReset" class="small" title="Вернуть текущие цены из сканера">Текущие цены</button>
+    </div>
+    <div id="cOut"></div>
+    <div id="cGo"></div>
+    <p class="note">Цены подтягиваются сами, пока вы их не меняете. Клик по сумме — скопировать.</p>
   </div>
   <script type="module" src="js/app.js"></script>
 </body>
