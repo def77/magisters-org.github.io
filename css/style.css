@@ -30,6 +30,7 @@ button:disabled { opacity: .5; cursor: default; }
 .side input, .side select { width: 110px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; font: inherit; }
 .side input#duelKey { width: 150px; }
 .checks label { justify-content: flex-start; }
+.checks .group { font-size: 11px; color: var(--muted); margin: 8px 0 2px; text-transform: uppercase; letter-spacing: .05em; }
 .checks input { width: auto; }
 
 main { padding: 0 18px 30px; min-width: 0; }

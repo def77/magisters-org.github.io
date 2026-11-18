@@ -60,6 +60,10 @@ export function matchGames(polyGames, duelEvents, { maxHours = 3, looseMinutes =
 /** A Duel market rewritten in Polymarket team order (perm from matchGames). */
 export function toPolyFrame(m, perm) {
   if (m.kind === 'total' || perm[0] === 0) return m;
+  if (m.kind === 'x') { // three-way result: team 0 <-> team 1, the draw stays; sides are "happens / not"
+    const line = 2 - m.line;
+    return { ...m, line, key: marketKey(m.kind, m.scope, m.unit, line) };
+  }
   // Duel team 0 is Polymarket team 1: swap sides; handicap of Polymarket team 0 = handicap of Duel team 1
   const line = m.kind === 'hcp' ? -m.line : m.line;
   return { ...m, line, key: marketKey(m.kind, m.scope, m.unit, line), outs: [m.outs[1], m.outs[0]] };
@@ -85,6 +89,7 @@ function askOf(leg, books) {
 }
 
 const sideLabel = (m, teams, i) => {
+  if (m.kind === 'x') { const name = [teams[0], 'Ничья', teams[1]][m.line]; return i === 0 ? name : `не ${m.line === 1 ? 'ничья' : name}`; }
   if (m.kind === 'win') return teams[i];
   if (m.kind === 'hcp') return `${teams[i]} ${signed(i === 0 ? m.line : -m.line)}`;
   return i === 0 ? `Больше ${m.line}` : `Меньше ${m.line}`;
