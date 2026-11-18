@@ -1,0 +1,27 @@
+{
+"note": "Real Gamma /markets/{id}, 2026-11-18",
+"markets": {
+"7062943": {
+"id": "7062943",
+"question": "Counter-Strike: Balkan Outlaws vs WRAITH PCIFIC (BO3) - European Pro League Playoffs",
+"closed": true,
+"active": true,
+"outcomes": "[\"Balkan Outlaws\", \"WRAITH PCIFIC\"]",
+"outcomePrices": "[\"1\", \"0\"]",
+"clobTokenIds": "[\"97219109316120769841788002821366699241579279946101856540132814082675508576191\", \"82649752337038161585443064937486755820158154531596082442167907137118797840260\"]",
+"umaResolutionStatus": "resolved",
+"closedTime": "2026-11-18 13:56:08.338587+00"
+},
+"7075600": {
+"id": "7075600",
+"question": "Counter-Strike: FORZE Reload vs G2 Ares (BO3) - European Pro League Playoffs",
+"closed": false,
+"active": true,
+"outcomes": "[\"FORZE Reload\", \"G2 Ares\"]",
+"outcomePrices": "[\"0.655\", \"0.345\"]",
+"clobTokenIds": "[\"62257768171276523108960397060045075139913719838568116554466730075604396708586\", \"19871855591418951089409597693616668496332675984367098232942265063681039741419\"]",
+"umaResolutionStatus": null,
+"closedTime": null
+}
+}
+}
