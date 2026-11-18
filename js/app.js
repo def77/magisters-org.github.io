@@ -3,6 +3,7 @@ import { parsePolyEvent, parseDuelEvent, duelEventStub } from './markets.js';
 import { matchGames, comparePair, valueBets, toPolyFrame } from './compare.js';
 import { PolyStream } from './live.js';
 import { calcArb } from './calc.js';
+import { LineLog } from './movement.js';
 
 // Polymarket series id  <->  Duel sport (found by title in /v4/sports)
 const SPORTS = [
@@ -22,12 +23,12 @@ const SPORTS = [
 const DEFAULTS = {
   duelKey: '', sports: SPORTS.map(s => s.id), bankroll: 100, minProfit: 0, maxProfit: 8, maxAgeMin: 10,
   extraPolyPct: 0, horizonH: 24, maxDuelEvents: 15,
-  duelSec: 120, duelHotSec: 30, hotSum: 1.02, discoveryMin: 10,
-  minEV: 3, maxSpread: 0.04, minDepthUsd: 20, kellyFraction: 0.25, valueBank: 1000,
+  duelSec: 180, duelHotSec: 30, hotSum: 1.01, discoveryMin: 10,
+  minEV: 3, maxSpread: 0.04, minDepthUsd: 20, kellyFraction: 0.25, valueBank: 1000, lagPP: 3,
 };
-const FIELDS = ['duelKey', 'bankroll', 'minProfit', 'maxProfit', 'maxAgeMin', 'extraPolyPct', 'horizonH', 'maxDuelEvents', 'duelSec', 'duelHotSec', 'hotSum', 'discoveryMin', 'minEV', 'maxSpread', 'minDepthUsd', 'kellyFraction', 'valueBank'];
+const FIELDS = ['duelKey', 'bankroll', 'minProfit', 'maxProfit', 'maxAgeMin', 'extraPolyPct', 'horizonH', 'maxDuelEvents', 'duelSec', 'duelHotSec', 'hotSum', 'discoveryMin', 'minEV', 'maxSpread', 'minDepthUsd', 'kellyFraction', 'valueBank', 'lagPP'];
 const LS = 'duelpoly.settings.v2';
-const CREDITS_PER_EVENT = 8; // between bulk (5) and single (10), for estimates
+const CREDITS_PER_EVENT = 10; // refreshes usually ask for one or two events at a time: 10 each
 
 const $ = s => document.querySelector(s);
 const $$ = s => [...document.querySelectorAll(s)];
@@ -122,15 +123,16 @@ async function discover() {
   const next = new Map();
   for (const p of keep) {
     const old = state.tracked.get(p.poly.id);
-    next.set(p.poly.id, { ...p, duelTitle: p.duel.title, duel: old && old.duelStubId === p.duel.id ? old.duel : null, duelAt: old?.duelStubId === p.duel.id ? old.duelAt : 0, duelStubId: p.duel.id, rows: old?.rows || [] });
+    const sameEvent = old && old.duelStubId === p.duel.id;
+    next.set(p.poly.id, { ...p, log: sameEvent ? old.log : new LineLog(), duelTitle: p.duel.title, duel: old && old.duelStubId === p.duel.id ? old.duel : null, duelAt: old?.duelStubId === p.duel.id ? old.duelAt : 0, duelStubId: p.duel.id, rows: old?.rows || [] });
   }
-  for (const p of chosen.slice(keep.length)) next.set(p.poly.id, { ...p, duelTitle: p.duel.title, duelStubId: p.duel.id, duel: null, rows: [], skipped: true });
+  for (const p of chosen.slice(keep.length)) next.set(p.poly.id, { ...p, log: new LineLog(), duelTitle: p.duel.title, duelStubId: p.duel.id, duel: null, rows: [], skipped: true });
   state.tracked = next; state.doubt = doubt; state.alone = alone; state.discoverAt = Date.now();
 }
 
 /* ------------------------------- Duel odds -------------------------------- */
 // refreshed more often: close to an arb, or a Duel price above Polymarket's fair line
-const isHot = t => (t.best != null && t.best < S.hotSum) || (t.values || []).some(v => v.value || (v.ev > 0 && !v.problems.length));
+const isHot = t => (t.best != null && t.best < S.hotSum) || (t.values || []).some(v => v.value);
 function due(t, now) {
   if (t.skipped) return false;
   if (!t.duelAt) return true;
@@ -151,6 +153,7 @@ async function refreshDuel(all = false) {
       t.duelAt = Date.now(); state.duelTickAt = t.duelAt;
       if (!d || d.skip) { t.duel = null; t.duelSkip = d?.skip || 'нет коэффициентов'; continue; }
       t.duel = d; t.duelSkip = null;
+      for (const m of d.markets.values()) { const pm = toPolyFrame(m, t.perm); t.log.duelPrices(pm.key, pm.outs.map(o => o.price), t.duelAt); }
     }
     state.spent = api.spent;
   }
@@ -187,6 +190,11 @@ function recompute(t) {
   const pair = { poly: t.poly, duel: t.duel, perm: t.perm, score: t.score }, books = booksFor(t);
   t.rows = comparePair(pair, books, S);
   t.values = valueBets(pair, books, S);
+  // line movement: remember Polymarket's fair line, then compare with when Duel last moved
+  const now = Date.now(), opt = { minMove: S.lagPP / 100 };
+  for (const v of t.values) if (v.fair && v.i === 0) t.log.fairP(v.market.key, v.fair.p[0], now);
+  for (const v of t.values) v.move = t.log.signal(v.market.key, v.i, now, opt);
+  for (const r of t.rows) r.move = t.log.signal(r.market.key, 1 - r.pi, now, opt);
   const clean = t.rows.filter(r => !r.problems.length);
   t.best = clean.length ? Math.min(...clean.map(r => r.sum)) : null;
 }
@@ -235,8 +243,8 @@ async function liveTick() {
     const n = await refreshDuel(false);
     if (n) {
       state.tracked.forEach(recompute);
-      setStatus(`Реал-тайм · Duel обновлён ${new Date().toLocaleTimeString()} · вилок ${allRows().filter(isArb).length}`, 'ok');
       render();
+      if (Date.now() - (state.accountAt || 0) > 60e3) { state.accountAt = Date.now(); updateCredits(); } // /account is free
     }
   } catch (e) {
     log(e.message, 'error');
@@ -251,7 +259,7 @@ async function startLive() {
   await fullScan();
   watchTokens();
   clearInterval(state.tick); state.tick = setInterval(liveTick, 5000);
-  state.creditTimer = setInterval(updateCredits, 5 * 60e3);
+  state.creditTimer = setInterval(updateCredits, 3 * 60e3);
   log('Реал-тайм включён: Polymarket — по WebSocket, Duel — по расписанию', 'ok');
 }
 function stopLive() {
@@ -269,6 +277,14 @@ const allRows = () => [...state.tracked.values()].flatMap(t => t.rows.map(r => (
 const isArb = r => r.arb && r.profitPct >= S.minProfit;
 const gameCell = r => `<div>${esc(r.poly.title)}</div><div class="sub">${when(r.poly.start)} · ${esc(r.poly.tournament || r.duel.tournament)}</div>`;
 const openBtns = r => `<div class="go"><a class="btn-pm" href="${esc(r.poly.url)}" target="polymarket" rel="noopener">Polymarket ↗</a><a class="btn-duel" href="${esc(r.duel.url)}" target="duel" rel="noopener">Duel ↗</a></div>`;
+/** Duel line movement seen this session, and whether Duel lags behind Polymarket. */
+const moveNote = m => {
+  if (!m) return '';
+  const parts = [];
+  if (m.changed) parts.push(`кэф менялся: ${m.changed.from} → ${m.changed.to} в ${new Date(m.changed.at).toLocaleTimeString().slice(0, 5)}`);
+  if (m.lags) parts.push(`<span class="tag warn" title="Справедливая вероятность этой стороны по Polymarket изменилась, а Duel кэф не трогал">Duel отстаёт: Polymarket ${m.delta > 0 ? '+' : ''}${(m.delta * 100).toFixed(1)} п.п. за ${ago(m.since)}</span>`);
+  return parts.length ? `<div class="sub">${parts.join(' · ')}</div>` : '';
+};
 const copy = (val, text) => `<span class="copy" data-copy="${val}" title="Скопировать">${text}</span>`;
 
 function renderCredits() {
@@ -291,7 +307,7 @@ function render() {
   for (const v of values) if (!state.seen.has(v.id)) state.seen.set(v.id, now);
   $('#nArbs').textContent = arbs.length;
   $('#nValues').textContent = values.length;
-  if (state.live && !state.busy) setStatus(`Реал-тайм · вилок ${arbs.length} · валуек ${values.length}${state.duelTickAt ? ` · Duel ${new Date(state.duelTickAt).toLocaleTimeString()}` : ''}`, 'ok');
+  if (state.live && !state.busy) setStatus(`Вилок ${arbs.length} · валуек ${values.length}${state.duelTickAt ? ` · Duel ${new Date(state.duelTickAt).toLocaleTimeString('ru-RU')}` : ''}`, 'ok');
   $('#nAll').textContent = rows.length;
   $('#nGames').textContent = state.tracked.size;
 
@@ -306,7 +322,7 @@ function render() {
       <td><span class="tag duel">Duel</span><span class="side-name">${esc(r.duelLeg.label)}</span><br>
           кэф <b>${r.duelLeg.price}</b><br>
           поставить ${copy(r.duelStake.toFixed(2), `<b>${usd(r.duelStake)}</b>`)}
-          <div class="sub">кэф получен ${ago(r.t.duelAt)} назад${isHot(r.t) && state.live ? ` · обновляю каждые ${S.duelHotSec} с` : ''}</div></td>
+          <div class="sub">кэф получен ${ago(r.t.duelAt)} назад${isHot(r.t) && state.live ? ` · обновляю каждые ${S.duelHotSec} с` : ''}</div>${moveNote(r.move)}</td>
       <td>${r.maxBank != null ? `до <b>${usd(r.maxBank)}</b><div class="sub">${r.maxShares.toFixed(0)} акций в стакане</div>${r.bankTooBig ? '<span class="tag warn">банк больше стакана</span>' : ''}` : '—'}
           <div><button class="small calc-open" data-id="${esc(r.id)}">Калькулятор</button></div></td>
     </tr>`).join('') : `<tr><td colspan="6" class="empty">${rows.length ? 'Вилок нет. Ближайшие к вилке — во вкладке «Все сравнения».' : 'Нажмите «Сканировать» или включите реал-тайм.'}</td></tr>`;
@@ -319,7 +335,7 @@ function render() {
       <td>${gameCell(v)}${openBtns(v)}</td>
       <td>${esc(v.label)}</td>
       <td><span class="tag duel">Duel</span><span class="side-name">${esc(d.label)}</span><br>кэф <b>${d.price}</b> · линия ${mv}
-          <div class="sub">кэф получен ${ago(v.t.duelAt)} назад</div></td>
+          <div class="sub">кэф получен ${ago(v.t.duelAt)} назад</div>${moveNote(v.move)}</td>
       <td>${(v.p * 100).toFixed(1)}% → кэф <b>${v.fairOdds.toFixed(2)}</b>
           <div class="sub">Polymarket ${esc(v.side)}: ${top.bid.toFixed(3)} / ${top.ask.toFixed(3)}, спред ${f.spread.toFixed(3)}</div></td>
       <td>${copy(v.stake.toFixed(2), `<b>${usd(v.stake)}</b>`)}<div class="sub">${(S.kellyFraction * 100).toFixed(0)}% Келли от ${usd(S.valueBank)}</div></td>
@@ -333,7 +349,7 @@ function render() {
       <td>${esc(r.label)}</td>
       <td>${esc(r.pSide)} <b>${r.polyLeg.price.toFixed(3)}</b></td>
       <td>${esc(r.duelLeg.label)} <b>@${r.duelLeg.price}</b></td>
-      <td class="sub">${esc(r.problems.join('; ') || (r.arb ? `вилка +${r.profitPct.toFixed(2)}%` : `маржа ${(r.sum * 100 - 100).toFixed(1)}%`))}</td>
+      <td class="sub">${esc(r.problems.join('; ') || (r.arb ? `вилка +${r.profitPct.toFixed(2)}%` : `маржа ${(r.sum * 100 - 100).toFixed(1)}%`))}${moveNote(r.move)}</td>
       <td>${openBtns(r)}</td>
     </tr>`).join('') : '<tr><td colspan="7" class="empty">Пока пусто.</td></tr>';
 

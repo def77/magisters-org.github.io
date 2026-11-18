@@ -44,6 +44,7 @@
         <label>EV от, % <input id="minEV" type="number" min="0" step="0.5"></label>
         <label>Спред Polymarket до <input id="maxSpread" type="number" min="0.005" step="0.005" title="Шире — цена Polymarket ненадёжна как справедливая"></label>
         <label>Объём у лучших цен от, $ <input id="minDepthUsd" type="number" min="0" step="10" title="Тонкий стакан легко сдвинуть — такая цена не справедливая"></label>
+        <label>«Duel отстаёт» от, п.п. <input id="lagPP" type="number" min="0.5" step="0.5" title="Насколько должна сдвинуться справедливая вероятность Polymarket, пока Duel не меняет кэф"></label>
         <label>Банк для валуек, $ <input id="valueBank" type="number" min="10" step="50"></label>
         <label>Доля Келли <input id="kellyFraction" type="number" min="0.05" max="1" step="0.05" title="0.25 — четверть Келли: безопаснее при ошибках в оценке"></label>
       </section>
