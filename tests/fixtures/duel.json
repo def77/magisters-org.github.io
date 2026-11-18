@@ -1,0 +1,2018 @@
+{
+"note": "Real DuelAPI responses, 2026-11-18",
+"event_forze": {
+"id": "2733765750258020401",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T12:00:00Z",
+"home_team": "FORZE Reload",
+"away_team": "G2 Ares",
+"tournament": "European Pro League Series 10",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 155,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Feuropean-pro-league-series-10%2Fforze-reload-g2-ares-2733765750258020401",
+"bookmakers": [
+{
+"key": "duel",
+"title": "Duel",
+"last_update": "2026-11-18T11:27:41Z",
+"markets": [
+{
+"key": "m_186",
+"market_id": "186",
+"spec": "",
+"title": "Winner",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "FORZE Reload",
+"price": 1.26,
+"open_price": 1.27,
+"move": -0.01
+},
+{
+"name": "G2 Ares",
+"price": 3.85,
+"open_price": 3.8,
+"move": 0.05
+}
+]
+},
+{
+"key": "m_330_mapnr=1",
+"market_id": "330",
+"spec": "mapnr=1",
+"title": "First map - winner",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "FORZE Reload",
+"price": 1.47,
+"open_price": 1.48,
+"move": -0.01
+},
+{
+"name": "G2 Ares",
+"price": 2.7,
+"open_price": 2.64,
+"move": 0.06
+}
+]
+},
+{
+"key": "m_330_mapnr=2",
+"market_id": "330",
+"spec": "mapnr=2",
+"title": "Second map - winner",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "FORZE Reload",
+"price": 1.36,
+"open_price": 1.34,
+"move": 0.02
+},
+{
+"name": "G2 Ares",
+"price": 3.15,
+"open_price": 3.25,
+"move": -0.1
+}
+]
+},
+{
+"key": "m_330_mapnr=3",
+"market_id": "330",
+"spec": "mapnr=3",
+"title": "Third map - winner",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "FORZE Reload",
+"price": 1.4,
+"open_price": 1.41,
+"move": -0.01
+},
+{
+"name": "G2 Ares",
+"price": 2.98,
+"open_price": 2.92,
+"move": 0.06
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=-2.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=-2.5",
+"title": "First map - round handicap (-2.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "FORZE Reload (-2.5)",
+"price": 1.72,
+"open_price": 1.73,
+"move": -0.01
+},
+{
+"name": "G2 Ares (+2.5)",
+"price": 2.12,
+"open_price": 2.1,
+"move": 0.02
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=-3.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=-3.5",
+"title": "First map - round handicap (-3.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "G2 Ares (+3.5)",
+"price": 1.76,
+"open_price": 1.75,
+"move": 0.01
+},
+{
+"name": "FORZE Reload (-3.5)",
+"price": 2.06,
+"open_price": 2.08,
+"move": -0.02
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=-4.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=-4.5",
+"title": "First map - round handicap (-4.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "G2 Ares (+4.5)",
+"price": 1.53,
+"open_price": 1.52,
+"move": 0.01
+},
+{
+"name": "FORZE Reload (-4.5)",
+"price": 2.5,
+"open_price": 2.54,
+"move": -0.04
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=-5.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=-5.5",
+"title": "First map - round handicap (-5.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "G2 Ares (+5.5)",
+"price": 1.38,
+"open_price": 1.37,
+"move": 0.01
+},
+{
+"name": "FORZE Reload (-5.5)",
+"price": 3.05,
+"open_price": 3.1,
+"move": -0.05
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=-6.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=-6.5",
+"title": "First map - round handicap (-6.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "G2 Ares (+6.5)",
+"price": 1.24,
+"open_price": 1.25,
+"move": -0.01
+},
+{
+"name": "FORZE Reload (-6.5)",
+"price": 4.1,
+"open_price": 3.9,
+"move": 0.2
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=-7.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=-7.5",
+"title": "First map - round handicap (-7.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "G2 Ares (+7.5)",
+"price": 1.16,
+"open_price": 1.17,
+"move": -0.01
+},
+{
+"name": "FORZE Reload (-7.5)",
+"price": 5.2,
+"open_price": 5.2,
+"move": 0
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=-8.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=-8.5",
+"title": "First map - round handicap (-8.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "G2 Ares (+8.5)",
+"price": 1.09,
+"open_price": 1.1,
+"move": -0.01
+},
+{
+"name": "FORZE Reload (-8.5)",
+"price": 7.2,
+"open_price": 7,
+"move": 0.2
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=-9.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=-9.5",
+"title": "First map - round handicap (-9.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "G2 Ares (+9.5)",
+"price": 1.05,
+"open_price": 1.05,
+"move": 0
+},
+{
+"name": "FORZE Reload (-9.5)",
+"price": 9.8,
+"open_price": 10,
+"move": -0.2
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=2.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=2.5",
+"title": "First map - round handicap (2.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "FORZE Reload (+2.5)",
+"price": 1.34,
+"open_price": 1.34,
+"move": 0
+},
+{
+"name": "G2 Ares (-2.5)",
+"price": 3.25,
+"open_price": 3.3,
+"move": -0.05
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=3.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=3.5",
+"title": "First map - round handicap (3.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "FORZE Reload (+3.5)",
+"price": 1.24,
+"open_price": 1.23,
+"move": 0.01
+},
+{
+"name": "G2 Ares (-3.5)",
+"price": 4.1,
+"open_price": 4.2,
+"move": -0.1
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=4.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=4.5",
+"title": "First map - round handicap (4.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "FORZE Reload (+4.5)",
+"price": 1.15,
+"open_price": 1.16,
+"move": -0.01
+},
+{
+"name": "G2 Ares (-4.5)",
+"price": 5.6,
+"open_price": 5.4,
+"move": 0.2
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=5.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=5.5",
+"title": "First map - round handicap (5.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "FORZE Reload (+5.5)",
+"price": 1.09,
+"open_price": 1.1,
+"move": -0.01
+},
+{
+"name": "G2 Ares (-5.5)",
+"price": 7.2,
+"open_price": 6.8,
+"move": 0.4
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=6.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=6.5",
+"title": "First map - round handicap (6.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "FORZE Reload (+6.5)",
+"price": 1.06,
+"open_price": 1.07,
+"move": -0.01
+},
+{
+"name": "G2 Ares (-6.5)",
+"price": 9,
+"open_price": 8.6,
+"move": 0.4
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=7.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=7.5",
+"title": "First map - round handicap (7.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "FORZE Reload (+7.5)",
+"price": 1.04,
+"open_price": 1.04,
+"move": 0
+},
+{
+"name": "G2 Ares (-7.5)",
+"price": 11,
+"open_price": 11,
+"move": 0
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=8.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=8.5",
+"title": "First map - round handicap (8.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "FORZE Reload (+8.5)",
+"price": 1.03,
+"open_price": 1.02,
+"move": 0.01
+},
+{
+"name": "G2 Ares (-8.5)",
+"price": 13,
+"open_price": 14,
+"move": -1
+}
+]
+},
+{
+"key": "m_332_mapnr=1|total=17.5",
+"market_id": "332",
+"spec": "mapnr=1|total=17.5",
+"title": "First map - total rounds (17.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "over 17.5",
+"price": 1.14,
+"open_price": 1.14,
+"move": 0
+},
+{
+"name": "under 17.5",
+"price": 5.8,
+"open_price": 5.6,
+"move": 0.2
+}
+]
+},
+{
+"key": "m_332_mapnr=1|total=18.5",
+"market_id": "332",
+"spec": "mapnr=1|total=18.5",
+"title": "First map - total rounds (18.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "over 18.5",
+"price": 1.24,
+"open_price": 1.26,
+"move": -0.02
+},
+{
+"name": "under 18.5",
+"price": 4.1,
+"open_price": 3.85,
+"move": 0.25
+}
+]
+},
+{
+"key": "m_332_mapnr=1|total=19.5",
+"market_id": "332",
+"spec": "mapnr=1|total=19.5",
+"title": "First map - total rounds (19.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "over 19.5",
+"price": 1.41,
+"open_price": 1.4,
+"move": 0.01
+},
+{
+"name": "under 19.5",
+"price": 2.92,
+"open_price": 2.94,
+"move": -0.02
+}
+]
+},
+{
+"key": "m_332_mapnr=1|total=20.5",
+"market_id": "332",
+"spec": "mapnr=1|total=20.5",
+"title": "First map - total rounds (20.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "over 20.5",
+"price": 1.66,
+"open_price": 1.64,
+"move": 0.02
+},
+{
+"name": "under 20.5",
+"price": 2.22,
+"open_price": 2.26,
+"move": -0.04
+}
+]
+},
+{
+"key": "m_332_mapnr=1|total=21.5",
+"market_id": "332",
+"spec": "mapnr=1|total=21.5",
+"title": "First map - total rounds (21.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "under 21.5",
+"price": 1.83,
+"open_price": 1.81,
+"move": 0.02
+},
+{
+"name": "over 21.5",
+"price": 1.98,
+"open_price": 2,
+"move": -0.02
+}
+]
+},
+{
+"key": "m_332_mapnr=1|total=22.5",
+"market_id": "332",
+"spec": "mapnr=1|total=22.5",
+"title": "First map - total rounds (22.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "under 22.5",
+"price": 1.51,
+"open_price": 1.49,
+"move": 0.02
+},
+{
+"name": "over 22.5",
+"price": 2.58,
+"open_price": 2.6,
+"move": -0.02
+}
+]
+},
+{
+"key": "m_327_hcp=-1.5",
+"market_id": "327",
+"spec": "hcp=-1.5",
+"title": "Map handicap (-1.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "G2 Ares (+1.5)",
+"price": 1.79,
+"open_price": 1.79,
+"move": 0
+},
+{
+"name": "FORZE Reload (-1.5)",
+"price": 2.02,
+"open_price": 2.04,
+"move": -0.02
+}
+]
+},
+{
+"key": "m_327_hcp=1.5",
+"market_id": "327",
+"spec": "hcp=1.5",
+"title": "Map handicap (1.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "FORZE Reload (+1.5)",
+"price": 1.08,
+"open_price": 1.08,
+"move": 0
+},
+{
+"name": "G2 Ares (-1.5)",
+"price": 7.8,
+"open_price": 7.8,
+"move": 0
+}
+]
+},
+{
+"key": "m_328_total=2.5",
+"market_id": "328",
+"spec": "total=2.5",
+"title": "Total maps (2.5)",
+"last_update": "2026-11-18T11:27:41Z",
+"outcomes": [
+{
+"name": "under 2.5",
+"price": 1.69,
+"open_price": 1.7,
+"move": -0.01
+},
+{
+"name": "over 2.5",
+"price": 2.18,
+"open_price": 2.16,
+"move": 0.02
+}
+]
+}
+]
+}
+]
+},
+"dota_odds": [
+{
+"id": "2734571080739074095",
+"sport_key": "dota_2",
+"sport_title": "Dota 2",
+"commence_time": "2026-11-18T12:00:00Z",
+"home_team": "PARIVISION",
+"away_team": "Aurora Gaming",
+"tournament": "Essence III",
+"category": "Dota 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 193,
+"duel_url": "https://duel.com/sports?bt-path=%2Fdota-2%2Fdota-2%2Fessence-iii%2Fparivision-aurora-gaming-2734571080739074095",
+"bookmakers": [
+{
+"key": "duel",
+"title": "Duel",
+"last_update": "2026-11-18T11:26:28Z",
+"markets": [
+{
+"key": "m_186",
+"market_id": "186",
+"spec": "",
+"title": "Winner",
+"last_update": "2026-11-18T11:26:28Z",
+"outcomes": [
+{
+"name": "PARIVISION",
+"price": 1.16,
+"open_price": 1.12,
+"move": 0.04
+},
+{
+"name": "Aurora Gaming",
+"price": 5.4,
+"open_price": 6.8,
+"move": -1.4
+}
+]
+},
+{
+"key": "m_330_mapnr=1",
+"market_id": "330",
+"spec": "mapnr=1",
+"title": "First map - winner",
+"last_update": "2026-11-18T11:26:28Z",
+"outcomes": [
+{
+"name": "PARIVISION",
+"price": 1.28,
+"open_price": 1.26,
+"move": 0.02
+},
+{
+"name": "Aurora Gaming",
+"price": 3.85,
+"open_price": 4,
+"move": -0.15
+}
+]
+},
+{
+"key": "m_330_mapnr=2",
+"market_id": "330",
+"spec": "mapnr=2",
+"title": "Second map - winner",
+"last_update": "2026-11-18T11:26:28Z",
+"outcomes": [
+{
+"name": "PARIVISION",
+"price": 1.28,
+"open_price": 1.26,
+"move": 0.02
+},
+{
+"name": "Aurora Gaming",
+"price": 3.85,
+"open_price": 4,
+"move": -0.15
+}
+]
+},
+{
+"key": "m_330_mapnr=3",
+"market_id": "330",
+"spec": "mapnr=3",
+"title": "Third map - winner",
+"last_update": "2026-11-18T11:26:28Z",
+"outcomes": [
+{
+"name": "PARIVISION",
+"price": 1.36,
+"open_price": 1.26,
+"move": 0.1
+},
+{
+"name": "Aurora Gaming",
+"price": 3.3,
+"open_price": 4,
+"move": -0.7
+}
+]
+},
+{
+"key": "m_327_hcp=-1.5",
+"market_id": "327",
+"spec": "hcp=-1.5",
+"title": "Map handicap (-1.5)",
+"last_update": "2026-11-18T11:26:28Z",
+"outcomes": [
+{
+"name": "PARIVISION (-1.5)",
+"price": 1.67,
+"open_price": 1.57,
+"move": 0.1
+},
+{
+"name": "Aurora Gaming (+1.5)",
+"price": 2.26,
+"open_price": 2.46,
+"move": -0.2
+}
+]
+},
+{
+"key": "m_327_hcp=1.5",
+"market_id": "327",
+"spec": "hcp=1.5",
+"title": "Map handicap (1.5)",
+"last_update": "2026-11-18T11:26:28Z",
+"outcomes": [
+{
+"name": "PARIVISION (+1.5)",
+"price": 1.04,
+"open_price": 1.02,
+"move": 0.02
+},
+{
+"name": "Aurora Gaming (-1.5)",
+"price": 12,
+"open_price": 18,
+"move": -6
+}
+]
+},
+{
+"key": "m_328_total=2.5",
+"market_id": "328",
+"spec": "total=2.5",
+"title": "Total maps (2.5)",
+"last_update": "2026-11-18T11:26:28Z",
+"outcomes": [
+{
+"name": "under 2.5",
+"price": 1.52,
+"open_price": 1.46,
+"move": 0.06
+},
+{
+"name": "over 2.5",
+"price": 2.6,
+"open_price": 2.8,
+"move": -0.2
+}
+]
+}
+]
+}
+]
+},
+{
+"id": "2734719163472945176",
+"sport_key": "dota_2",
+"sport_title": "Dota 2",
+"commence_time": "2026-11-18T13:00:00Z",
+"home_team": "Angry Birds",
+"away_team": "CyberHero",
+"tournament": "Asgard Championship Season 2",
+"category": "Dota 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 23,
+"duel_url": "https://duel.com/sports?bt-path=%2Fdota-2%2Fdota-2%2Fasgard-championship-season-2%2Fangry-birds-cyberhero-2734719163472945176",
+"bookmakers": [
+{
+"key": "duel",
+"title": "Duel",
+"last_update": "2026-11-18T11:29:03Z",
+"markets": [
+{
+"key": "m_186",
+"market_id": "186",
+"spec": "",
+"title": "Winner",
+"last_update": "2026-11-18T11:29:03Z",
+"outcomes": [
+{
+"name": "CyberHero",
+"price": 1.53,
+"open_price": 1.53,
+"move": 0
+},
+{
+"name": "Angry Birds",
+"price": 2.5,
+"open_price": 2.5,
+"move": 0
+}
+]
+},
+{
+"key": "m_330_mapnr=1",
+"market_id": "330",
+"spec": "mapnr=1",
+"title": "First map - winner",
+"last_update": "2026-11-18T11:29:03Z",
+"outcomes": [
+{
+"name": "CyberHero",
+"price": 1.64,
+"open_price": 1.64,
+"move": 0
+},
+{
+"name": "Angry Birds",
+"price": 2.26,
+"open_price": 2.26,
+"move": 0
+}
+]
+},
+{
+"key": "m_330_mapnr=2",
+"market_id": "330",
+"spec": "mapnr=2",
+"title": "Second map - winner",
+"last_update": "2026-11-18T11:29:03Z",
+"outcomes": [
+{
+"name": "CyberHero",
+"price": 1.64,
+"open_price": 1.64,
+"move": 0
+},
+{
+"name": "Angry Birds",
+"price": 2.26,
+"open_price": 2.26,
+"move": 0
+}
+]
+},
+{
+"key": "m_330_mapnr=3",
+"market_id": "330",
+"spec": "mapnr=3",
+"title": "Third map - winner",
+"last_update": "2026-11-18T11:29:03Z",
+"outcomes": [
+{
+"name": "CyberHero",
+"price": 1.64,
+"open_price": 1.64,
+"move": 0
+},
+{
+"name": "Angry Birds",
+"price": 2.26,
+"open_price": 2.26,
+"move": 0
+}
+]
+},
+{
+"key": "m_327_hcp=-1.5",
+"market_id": "327",
+"spec": "hcp=-1.5",
+"title": "Map handicap (-1.5)",
+"last_update": "2026-11-18T11:29:03Z",
+"outcomes": [
+{
+"name": "CyberHero (+1.5)",
+"price": 1.17,
+"open_price": 1.17,
+"move": 0
+},
+{
+"name": "Angry Birds (-1.5)",
+"price": 5,
+"open_price": 5,
+"move": 0
+}
+]
+},
+{
+"key": "m_327_hcp=1.5",
+"market_id": "327",
+"spec": "hcp=1.5",
+"title": "Map handicap (1.5)",
+"last_update": "2026-11-18T11:29:03Z",
+"outcomes": [
+{
+"name": "Angry Birds (+1.5)",
+"price": 1.46,
+"open_price": 1.46,
+"move": 0
+},
+{
+"name": "CyberHero (-1.5)",
+"price": 2.72,
+"open_price": 2.72,
+"move": 0
+}
+]
+},
+{
+"key": "m_328_total=2.5",
+"market_id": "328",
+"spec": "total=2.5",
+"title": "Total maps (2.5)",
+"last_update": "2026-11-18T11:29:03Z",
+"outcomes": [
+{
+"name": "under 2.5",
+"price": 1.85,
+"open_price": 1.85,
+"move": 0
+},
+{
+"name": "over 2.5",
+"price": 1.95,
+"open_price": 1.95,
+"move": 0
+}
+]
+}
+]
+}
+]
+}
+],
+"cs_odds_live_and_outright": [
+{
+"id": "2734768587901394985",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T08:00:00Z",
+"home_team": "Team Perfecto",
+"away_team": "Team Jerry",
+"tournament": "P Galaxy",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "1st period",
+"scores": {
+"home": "2",
+"away": "1"
+},
+"markets_count": 2,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fp-galaxy%2Fteam-perfecto-team-jerry-2734768587901394985",
+"bookmakers": [
+{
+"key": "duel",
+"title": "Duel",
+"last_update": "2026-11-18T11:00:50Z",
+"markets": [
+{
+"key": "m_186",
+"market_id": "186",
+"spec": "",
+"title": "Winner",
+"last_update": "2026-11-18T11:00:50Z",
+"outcomes": [
+{
+"name": "Team Jerry",
+"price": 6.8,
+"open_price": 1.77,
+"move": 5.03
+},
+{
+"name": "Team Perfecto",
+"price": 1.1,
+"open_price": 2.08,
+"move": -0.98
+}
+]
+},
+{
+"key": "m_330_mapnr=3",
+"market_id": "330",
+"spec": "mapnr=3",
+"title": "Third map - winner",
+"last_update": "2026-11-18T11:00:50Z",
+"outcomes": [
+{
+"name": "Team Jerry",
+"price": 6.8,
+"open_price": 1.77,
+"move": 5.03
+},
+{
+"name": "Team Perfecto",
+"price": 1.1,
+"open_price": 2.08,
+"move": -0.98
+}
+]
+}
+]
+}
+]
+},
+{
+"id": "2734646040379682827",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T08:58:00Z",
+"home_team": "Rooster",
+"away_team": "The Huns Esports",
+"tournament": "European Pro League AS Season 1",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "1st period",
+"scores": {
+"home": "0",
+"away": "1"
+},
+"markets_count": 96,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Feuropean-pro-league-as-season-1%2Frooster-the-huns-esports-2734646040379682827",
+"bookmakers": [
+{
+"key": "duel",
+"title": "Duel",
+"last_update": "2026-11-18T10:26:34Z",
+"markets": [
+{
+"key": "m_330_mapnr=1",
+"market_id": "330",
+"spec": "mapnr=1",
+"title": "First map - winner",
+"last_update": "2026-11-18T10:26:34Z",
+"outcomes": [
+{
+"name": "The Huns Esports",
+"price": 1.03,
+"open_price": 1.36,
+"move": -0.33
+},
+{
+"name": "Rooster",
+"price": 13,
+"open_price": 3.15,
+"move": 9.85
+}
+]
+},
+{
+"key": "m_330_mapnr=2",
+"market_id": "330",
+"spec": "mapnr=2",
+"title": "Second map - winner",
+"last_update": "2026-11-18T10:26:34Z",
+"outcomes": [
+{
+"name": "The Huns Esports",
+"price": 1.08,
+"open_price": 1.36,
+"move": -0.28
+},
+{
+"name": "Rooster",
+"price": 8,
+"open_price": 3.15,
+"move": 4.85
+}
+]
+},
+{
+"key": "m_330_mapnr=3",
+"market_id": "330",
+"spec": "mapnr=3",
+"title": "Third map - winner",
+"last_update": "2026-11-18T10:26:34Z",
+"outcomes": [
+{
+"name": "The Huns Esports",
+"price": 1.47,
+"open_price": 1.36,
+"move": 0.11
+},
+{
+"name": "Rooster",
+"price": 2.7,
+"open_price": 3.15,
+"move": -0.45
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=-2.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=-2.5",
+"title": "First map - round handicap (-2.5)",
+"last_update": "2026-11-18T10:26:34Z",
+"outcomes": [
+{
+"name": "The Huns Esports (+2.5)",
+"price": 1.01,
+"open_price": 1.27,
+"move": -0.26
+},
+{
+"name": "Rooster (-2.5)",
+"price": 13,
+"open_price": 3.6,
+"move": 9.4
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=2.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=2.5",
+"title": "First map - round handicap (2.5)",
+"last_update": "2026-11-18T10:26:34Z",
+"outcomes": [
+{
+"name": "The Huns Esports (-2.5)",
+"price": 1.27,
+"open_price": 1.58,
+"move": -0.31
+},
+{
+"name": "Rooster (+2.5)",
+"price": 3.6,
+"open_price": 2.38,
+"move": 1.22
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=3.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=3.5",
+"title": "First map - round handicap (3.5)",
+"last_update": "2026-11-18T10:26:34Z",
+"outcomes": [
+{
+"name": "Rooster (+3.5)",
+"price": 2.35,
+"open_price": 1.9,
+"move": 0.45
+},
+{
+"name": "The Huns Esports (-3.5)",
+"price": 1.57,
+"open_price": 1.9,
+"move": -0.33
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=4.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=4.5",
+"title": "First map - round handicap (4.5)",
+"last_update": "2026-11-18T10:26:34Z",
+"outcomes": [
+{
+"name": "Rooster (+4.5)",
+"price": 1.7,
+"open_price": 1.6,
+"move": 0.1
+},
+{
+"name": "The Huns Esports (-4.5)",
+"price": 2.1,
+"open_price": 2.32,
+"move": -0.22
+}
+]
+},
+{
+"key": "m_331_mapnr=1|hcp=5.5",
+"market_id": "331",
+"spec": "mapnr=1|hcp=5.5",
+"title": "First map - round handicap (5.5)",
+"last_update": "2026-11-18T10:26:34Z",
+"outcomes": [
+{
+"name": "Rooster (+5.5)",
+"price": 5,
+"open_price": 1.41,
+"move": 3.59
+},
+{
+"name": "The Huns Esports (-5.5)",
+"price": 1.16,
+"open_price": 2.92,
+"move": -1.76
+}
+]
+},
+{
+"key": "m_332_mapnr=1|total=20.5",
+"market_id": "332",
+"spec": "mapnr=1|total=20.5",
+"title": "First map - total rounds (20.5)",
+"last_update": "2026-11-18T10:26:34Z",
+"outcomes": [
+{
+"name": "over 20.5",
+"price": 5,
+"open_price": 1.69,
+"move": 3.31
+},
+{
+"name": "under 20.5",
+"price": 1.16,
+"open_price": 2.16,
+"move": -1
+}
+]
+},
+{
+"key": "m_332_mapnr=1|total=21.5",
+"market_id": "332",
+"spec": "mapnr=1|total=21.5",
+"title": "First map - total rounds (21.5)",
+"last_update": "2026-11-18T10:26:34Z",
+"outcomes": [
+{
+"name": "under 21.5",
+"price": 2.1,
+"open_price": 1.73,
+"move": 0.37
+},
+{
+"name": "over 21.5",
+"price": 1.7,
+"open_price": 2.1,
+"move": -0.4
+}
+]
+},
+{
+"key": "m_332_mapnr=1|total=22.5",
+"market_id": "332",
+"spec": "mapnr=1|total=22.5",
+"title": "First map - total rounds (22.5)",
+"last_update": "2026-11-18T10:26:34Z",
+"outcomes": [
+{
+"name": "under 22.5",
+"price": 1.62,
+"open_price": 1.42,
+"move": 0.2
+},
+{
+"name": "over 22.5",
+"price": 2.25,
+"open_price": 2.86,
+"move": -0.61
+}
+]
+},
+{
+"key": "m_332_mapnr=1|total=23.5",
+"market_id": "332",
+"spec": "mapnr=1|total=23.5",
+"title": "First map - total rounds (23.5)",
+"last_update": "2026-11-18T10:26:34Z",
+"outcomes": [
+{
+"name": "under 23.5",
+"price": 1.32,
+"open_price": 1.22,
+"move": 0.1
+},
+{
+"name": "over 23.5",
+"price": 3.2,
+"open_price": 4,
+"move": -0.8
+}
+]
+},
+{
+"key": "m_332_mapnr=1|total=24.5",
+"market_id": "332",
+"spec": "mapnr=1|total=24.5",
+"title": "First map - total rounds (24.5)",
+"last_update": "2026-11-18T10:26:34Z",
+"outcomes": [
+{
+"name": "under 24.5",
+"price": 1.09,
+"open_price": 1.1,
+"move": -0.01
+},
+{
+"name": "over 24.5",
+"price": 7,
+"open_price": 6.2,
+"move": 0.8
+}
+]
+}
+]
+}
+]
+},
+{
+"id": "2734646040379682846",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T09:02:00Z",
+"home_team": "Nice Try",
+"away_team": "ex-RUSTEC",
+"tournament": "NODWIN Clutch Series #14",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "3rd period",
+"scores": {
+"home": "2",
+"away": "0"
+},
+"markets_count": 2,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fnodwin-clutch-series-14%2Fnice-try-ex-rustec-2734646040379682846",
+"bookmakers": [
+{
+"key": "duel",
+"title": "Duel",
+"last_update": "2026-11-18T10:32:53Z",
+"markets": [
+{
+"key": "m_330_mapnr=2",
+"market_id": "330",
+"spec": "mapnr=2",
+"title": "Second map - winner",
+"last_update": "2026-11-18T10:32:53Z",
+"outcomes": [
+{
+"name": "ex-RUSTEC",
+"price": 13,
+"open_price": 1.73,
+"move": 11.27
+},
+{
+"name": "Nice Try",
+"price": 1.03,
+"open_price": 2.1,
+"move": -1.07
+}
+]
+},
+{
+"key": "m_330_mapnr=3",
+"market_id": "330",
+"spec": "mapnr=3",
+"title": "Third map - winner",
+"last_update": "2026-11-18T10:32:53Z",
+"outcomes": [
+{
+"name": "ex-RUSTEC",
+"price": 1.62,
+"open_price": 1.73,
+"move": -0.11
+},
+{
+"name": "Nice Try",
+"price": 2.25,
+"open_price": 2.1,
+"move": 0.15
+}
+]
+}
+]
+}
+]
+},
+{
+"id": "2732596120546054189",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T10:00:00Z",
+"home_team": "RUSH:Brno 2026",
+"away_team": "Winner",
+"tournament": "RUSH:Brno 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 2,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Frushbrno-2026%2Frushbrno-2026-winner-2732596120546054189",
+"bookmakers": [
+{
+"key": "duel",
+"title": "Duel",
+"last_update": "2026-11-18T09:57:46Z",
+"markets": []
+}
+]
+}
+],
+"cs_events": [
+{
+"id": "2734768587901394985",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T08:00:00Z",
+"home_team": "Team Perfecto",
+"away_team": "Team Jerry",
+"tournament": "P Galaxy",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "1st period",
+"scores": {
+"home": "2",
+"away": "1"
+},
+"markets_count": 2,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fp-galaxy%2Fteam-perfecto-team-jerry-2734768587901394985"
+},
+{
+"id": "2734646040379682827",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T08:58:00Z",
+"home_team": "Rooster",
+"away_team": "The Huns Esports",
+"tournament": "European Pro League AS Season 1",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "1st period",
+"scores": {
+"home": "0",
+"away": "1"
+},
+"markets_count": 96,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Feuropean-pro-league-as-season-1%2Frooster-the-huns-esports-2734646040379682827"
+},
+{
+"id": "2734646040379682846",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T09:02:00Z",
+"home_team": "Nice Try",
+"away_team": "ex-RUSTEC",
+"tournament": "NODWIN Clutch Series #14",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "3rd period",
+"scores": {
+"home": "2",
+"away": "0"
+},
+"markets_count": 2,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fnodwin-clutch-series-14%2Fnice-try-ex-rustec-2734646040379682846"
+},
+{
+"id": "2732596120546054189",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T10:00:00Z",
+"home_team": "RUSH:Brno 2026",
+"away_team": "Winner",
+"tournament": "RUSH:Brno 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 2,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Frushbrno-2026%2Frushbrno-2026-winner-2732596120546054189"
+},
+{
+"id": "2734646040379682852",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T12:00:00Z",
+"home_team": "ILLYRIANS",
+"away_team": "Infurity Gaming",
+"tournament": "Fiesta Series 4",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 15,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Ffiesta-series-4%2Fillyrians-infurity-gaming-2734646040379682852"
+},
+{
+"id": "2733765750258020401",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T12:00:00Z",
+"home_team": "FORZE Reload",
+"away_team": "G2 Ares",
+"tournament": "European Pro League Series 10",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 155,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Feuropean-pro-league-series-10%2Fforze-reload-g2-ares-2733765750258020401"
+},
+{
+"id": "2734549558221762592",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T12:00:00Z",
+"home_team": "33 Team",
+"away_team": "Team Spirit Academy",
+"tournament": "NODWIN Clutch Series #14",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 148,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fnodwin-clutch-series-14%2F33-team-team-spirit-academy-2734549558221762592"
+},
+{
+"id": "2734646040379682849",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T12:00:00Z",
+"home_team": "ex-RUSTEC",
+"away_team": "mouz NXT",
+"tournament": "CCT Europe 2026 Series #14",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 15,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fcct-europe-2026-series-14%2Fex-rustec-mouz-nxt-2734646040379682849"
+},
+{
+"id": "2734644425308397580",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T13:00:00Z",
+"home_team": "Team PCH3LK1N",
+"away_team": "Team WorldEdit",
+"tournament": "Star Series Season 4",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 73,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fstar-series-season-4%2Fteam-pch3lk1n-team-worldedit-2734644425308397580"
+},
+{
+"id": "2734644425308397569",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T13:00:00Z",
+"home_team": "Phantom Esports",
+"away_team": "Metizport",
+"tournament": "RUSH:Brno 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 89,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Frushbrno-2026%2Fphantom-esports-metizport-2734644425308397569"
+},
+{
+"id": "2734583223807004679",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T13:30:00Z",
+"home_team": "Team UNiTY",
+"away_team": "GamerLegion",
+"tournament": "Ranked Episode 6",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 139,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Franked-episode-6%2Fteam-unity-gamerlegion-2734583223807004679"
+},
+{
+"id": "2734770705605484566",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T14:30:00Z",
+"home_team": "Team tried",
+"away_team": "Team Deko",
+"tournament": "P Galaxy",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 46,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fp-galaxy%2Fteam-tried-team-deko-2734770705605484566"
+},
+{
+"id": "2734491068446937137",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T16:00:00Z",
+"home_team": "Sinners Esports",
+"away_team": "Alliance",
+"tournament": "RUSH:Brno 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 163,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Frushbrno-2026%2Fsinners-esports-alliance-2734491068446937137"
+},
+{
+"id": "2734491068446937136",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T16:00:00Z",
+"home_team": "Inner Circle",
+"away_team": "Sangal Esports",
+"tournament": "Ranked Episode 6",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 138,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Franked-episode-6%2Finner-circle-sangal-esports-2734491068446937136"
+},
+{
+"id": "2734644425308397581",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T17:00:00Z",
+"home_team": "Team Bratishkin",
+"away_team": "Team leva2k",
+"tournament": "Star Series Season 4",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 115,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fstar-series-season-4%2Fteam-bratishkin-team-leva2k-2734644425308397581"
+},
+{
+"id": "2734646040379682853",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T18:00:00Z",
+"home_team": "LPH",
+"away_team": "Honved",
+"tournament": "Fiesta Series 4",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 15,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Ffiesta-series-4%2Flph-honved-2734646040379682853"
+},
+{
+"id": "2734700816161181722",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T18:30:00Z",
+"home_team": "Fraternity",
+"away_team": "ZOTIX",
+"tournament": "ESEA Advanced Season 59 EU",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 4,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fesea-advanced-season-59-eu%2Ffraternity-zotix-2734700816161181722"
+},
+{
+"id": "2734583223807004681",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T18:30:00Z",
+"home_team": "Ninjas in Pyjamas",
+"away_team": "Luminosity Gaming",
+"tournament": "Ranked Episode 6",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 138,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Franked-episode-6%2Fninjas-in-pyjamas-luminosity-gaming-2734583223807004681"
+},
+{
+"id": "2734644425308397570",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-18T19:00:00Z",
+"home_team": "BBL Esports",
+"away_team": "Team Envy",
+"tournament": "RUSH:Brno 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 89,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Frushbrno-2026%2Fbbl-esports-team-envy-2734644425308397570"
+},
+{
+"id": "2729700952578871340",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-24T04:00:00Z",
+"home_team": "PGL Major Singapore 2026",
+"away_team": "Props 3",
+"tournament": "PGL Major Singapore 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 15,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fpgl-major-singapore-2026%2Fpgl-major-singapore-2026-props-3-2729700952578871340"
+},
+{
+"id": "2729700952578871339",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-24T04:00:00Z",
+"home_team": "PGL Major Singapore 2026",
+"away_team": "Props 2",
+"tournament": "PGL Major Singapore 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 16,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fpgl-major-singapore-2026%2Fpgl-major-singapore-2026-props-2-2729700952578871339"
+},
+{
+"id": "2729700952578871342",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-24T04:00:00Z",
+"home_team": "PGL Major Singapore 2026",
+"away_team": "Winner",
+"tournament": "PGL Major Singapore 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 28,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fpgl-major-singapore-2026%2Fpgl-major-singapore-2026-winner-2729700952578871342"
+},
+{
+"id": "2729278431194914853",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-24T04:00:00Z",
+"home_team": "Heroic",
+"away_team": "Imperial",
+"tournament": "PGL Major Singapore 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 49,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fpgl-major-singapore-2026%2Fheroic-imperial-2729278431194914853"
+},
+{
+"id": "2729700952578871341",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-24T04:00:00Z",
+"home_team": "PGL Major Singapore 2026",
+"away_team": "Props 4",
+"tournament": "PGL Major Singapore 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 14,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fpgl-major-singapore-2026%2Fpgl-major-singapore-2026-props-4-2729700952578871341"
+},
+{
+"id": "2729278431194914851",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-24T04:00:00Z",
+"home_team": "9z Team",
+"away_team": "Lynn Vision",
+"tournament": "PGL Major Singapore 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 51,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fpgl-major-singapore-2026%2F9z-team-lynn-vision-2729278431194914851"
+},
+{
+"id": "2729700952578871338",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-24T04:00:00Z",
+"home_team": "PGL Major Singapore 2026",
+"away_team": "Props 1",
+"tournament": "PGL Major Singapore 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 16,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fpgl-major-singapore-2026%2Fpgl-major-singapore-2026-props-1-2729700952578871338"
+},
+{
+"id": "2729278431194914849",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-24T05:00:00Z",
+"home_team": "100 Thieves",
+"away_team": "Chinggis Warriors",
+"tournament": "PGL Major Singapore 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 45,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fpgl-major-singapore-2026%2F100-thieves-chinggis-warriors-2729278431194914849"
+},
+{
+"id": "2729278431194914855",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-24T05:00:00Z",
+"home_team": "Ninjas in Pyjamas",
+"away_team": "M80",
+"tournament": "PGL Major Singapore 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 44,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fpgl-major-singapore-2026%2Fninjas-in-pyjamas-m80-2729278431194914855"
+},
+{
+"id": "2729278431194914856",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-24T06:00:00Z",
+"home_team": "PARIVISION",
+"away_team": "DENDELE CS",
+"tournament": "PGL Major Singapore 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 47,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fpgl-major-singapore-2026%2Fparivision-dendele-cs-2729278431194914856"
+},
+{
+"id": "2729278431194914854",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-24T06:00:00Z",
+"home_team": "Team Liquid",
+"away_team": "GOSH",
+"tournament": "PGL Major Singapore 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 55,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fpgl-major-singapore-2026%2Fteam-liquid-gosh-2729278431194914854"
+},
+{
+"id": "2729278431194914852",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-24T07:00:00Z",
+"home_team": "FaZe",
+"away_team": "Wildcard",
+"tournament": "PGL Major Singapore 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 46,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fpgl-major-singapore-2026%2Ffaze-wildcard-2729278431194914852"
+},
+{
+"id": "2729278431194914850",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-24T07:00:00Z",
+"home_team": "Eternal Fire",
+"away_team": "FlyQuest",
+"tournament": "PGL Major Singapore 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 50,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fpgl-major-singapore-2026%2Feternal-fire-flyquest-2729278431194914850"
+},
+{
+"id": "2734489735929139207",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-30T11:00:00Z",
+"home_team": "Betclic",
+"away_team": "Alliance",
+"tournament": "Journey Winter 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 141,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fjourney-winter-2026%2Fbetclic-alliance-2734489735929139207"
+},
+{
+"id": "2734489735929139208",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-11-30T11:00:00Z",
+"home_team": "Fnatic",
+"away_team": "Team Brute",
+"tournament": "Journey Winter 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 127,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fjourney-winter-2026%2Ffnatic-team-brute-2734489735929139208"
+},
+{
+"id": "2734489735929139210",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-12-01T11:00:00Z",
+"home_team": "Sangal Esports",
+"away_team": "Iberian Soul",
+"tournament": "Journey Winter 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 156,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fjourney-winter-2026%2Fsangal-esports-iberian-soul-2734489735929139210"
+},
+{
+"id": "2734489735929139236",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-12-02T11:00:00Z",
+"home_team": "Team Envy",
+"away_team": "Metizport",
+"tournament": "Journey Winter 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 156,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fjourney-winter-2026%2Fteam-envy-metizport-2734489735929139236"
+},
+{
+"id": "2734489735929139235",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-12-02T11:00:00Z",
+"home_team": "Inner Circle",
+"away_team": "Nexus Gaming",
+"tournament": "Journey Winter 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 151,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fjourney-winter-2026%2Finner-circle-nexus-gaming-2734489735929139235"
+},
+{
+"id": "2734494855265918977",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-12-03T11:00:00Z",
+"home_team": "BIG",
+"away_team": "EYEBALLERS",
+"tournament": "Journey Winter 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 157,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fjourney-winter-2026%2Fbig-eyeballers-2734494855265918977"
+},
+{
+"id": "2734489735929139237",
+"sport_key": "counter_strike",
+"sport_title": "Counter-Strike",
+"commence_time": "2026-12-03T11:00:00Z",
+"home_team": "GamerLegion",
+"away_team": "SAW",
+"tournament": "Journey Winter 2026",
+"category": "Counter-Strike 2",
+"live": false,
+"status": "Not started",
+"scores": null,
+"markets_count": 147,
+"duel_url": "https://duel.com/sports?bt-path=%2Fcounter-strike%2Fcounter-strike-2%2Fjourney-winter-2026%2Fgamerlegion-saw-2734489735929139237"
+}
+]
+}
