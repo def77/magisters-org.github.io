@@ -1,5 +1,5 @@
 import { DuelApi, polyEvents, polyBooks } from './api.js';
-import { parsePolyEvent, parseDuelEvent, duelEventStub } from './markets.js';
+import { parsePolyEvent, parseDuelEvent, duelEventStub, mergePolyGames } from './markets.js';
 import { matchGames, comparePair, valueBets, toPolyFrame } from './compare.js';
 import { PolyStream } from './live.js';
 import { calcArb } from './calc.js';
@@ -19,9 +19,29 @@ const SPORTS = [
   { id: 'mlbb', label: 'Mobile Legends', series: 10426, duel: /^mobile legends/i },
   { id: 'wr', label: 'LoL: Wild Rift', series: 10429, duel: /wild rift/i },
   { id: 'sc2', label: 'StarCraft II', series: 10435, duel: /^starcraft/i },
+  // classic sports: profile = how both sites settle the markets (see markets.js)
+  { id: 'epl', label: 'Футбол: АПЛ', series: 10188, duel: /^soccer$/i, profile: 'soccer' },
+  { id: 'laliga', label: 'Футбол: Ла Лига', series: 10193, duel: /^soccer$/i, profile: 'soccer' },
+  { id: 'seriea', label: 'Футбол: Серия А', series: 10203, duel: /^soccer$/i, profile: 'soccer' },
+  { id: 'bund', label: 'Футбол: Бундеслига', series: 10194, duel: /^soccer$/i, profile: 'soccer' },
+  { id: 'ligue1', label: 'Футбол: Лига 1', series: 10195, duel: /^soccer$/i, profile: 'soccer' },
+  { id: 'ucl', label: 'Футбол: Лига чемпионов', series: 10204, duel: /^soccer$/i, profile: 'soccer' },
+  { id: 'uel', label: 'Футбол: Лига Европы', series: 10209, duel: /^soccer$/i, profile: 'soccer' },
+  { id: 'ere', label: 'Футбол: Эредивизи', series: 10286, duel: /^soccer$/i, profile: 'soccer' },
+  { id: 'por', label: 'Футбол: Португалия', series: 10330, duel: /^soccer$/i, profile: 'soccer' },
+  { id: 'tur', label: 'Футбол: Турция', series: 10292, duel: /^soccer$/i, profile: 'soccer' },
+  { id: 'mls', label: 'Футбол: MLS', series: 10189, duel: /^soccer$/i, profile: 'soccer' },
+  { id: 'bra', label: 'Футбол: Бразилия', series: 10359, duel: /^soccer$/i, profile: 'soccer' },
+  { id: 'arg', label: 'Футбол: Аргентина', series: 10312, duel: /^soccer$/i, profile: 'soccer' },
+  { id: 'nba', label: 'Баскетбол: NBA', series: 10345, duel: /^basketball$/i, profile: 'basketball' },
+  { id: 'euroleague', label: 'Баскетбол: Евролига', series: 10371, duel: /^basketball$/i, profile: 'basketball' },
+  { id: 'nhl', label: 'Хоккей: NHL', series: 10346, duel: /^ice hockey$/i, profile: 'hockey' },
+  { id: 'atp', label: 'Теннис: ATP', series: 10365, duel: /^tennis$/i, profile: 'tennis', risk: 'Теннис: если игрок снимется, Polymarket засчитает победу сопернику, а Duel может вернуть ставку — вилка станет односторонней' },
+  { id: 'wta', label: 'Теннис: WTA', series: 10366, duel: /^tennis$/i, profile: 'tennis', risk: 'Теннис: если игрок снимется, Polymarket засчитает победу сопернику, а Duel может вернуть ставку — вилка станет односторонней' },
 ];
+SPORTS.forEach(sp => { sp.profile ||= 'esports'; });
 const DEFAULTS = {
-  duelKey: '', sports: SPORTS.map(s => s.id), bankroll: 100, minProfit: 0, maxProfit: 8, maxAgeMin: 10,
+  duelKey: '', sports: SPORTS.filter(s => s.profile === 'esports' || ['epl', 'ucl', 'nba', 'nhl', 'atp'].includes(s.id)).map(s => s.id), bankroll: 100, minProfit: 0, maxProfit: 8, maxAgeMin: 10,
   extraPolyPct: 0, horizonH: 24, maxDuelEvents: 15,
   duelSec: 180, duelHotSec: 30, hotSum: 1.01, discoveryMin: 10,
   minEV: 3, maxSpread: 0.04, minDepthUsd: 20, kellyFraction: 0.25, valueBank: 1000, lagPP: 3,
@@ -55,7 +75,9 @@ if (window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k))).c
 /* ---------------------------------- form ---------------------------------- */
 function fillForm() {
   for (const f of FIELDS) $('#' + f).value = S[f];
-  $('#sports').innerHTML = SPORTS.map(sp => `<label><input type="checkbox" value="${sp.id}" ${S.sports.includes(sp.id) ? 'checked' : ''}> ${sp.label}</label>`).join('');
+  const box = sp => `<label><input type="checkbox" value="${sp.id}" ${S.sports.includes(sp.id) ? 'checked' : ''}> ${sp.label}</label>`;
+  $('#sports').innerHTML = `<div class="group">Киберспорт</div>${SPORTS.filter(s => s.profile === 'esports').map(box).join('')}
+    <div class="group">Спорт</div>${SPORTS.filter(s => s.profile !== 'esports').map(box).join('')}`;
   costNote();
 }
 function readForm() {
@@ -100,15 +122,17 @@ async function discover() {
   const duelSports = await api.sports();
   const horizon = Date.now() + S.horizonH * 3600e3;
   const found = new Map(), doubt = [], alone = [];
+  const duelLists = new Map(); // one Duel events list per Duel sport (several football leagues share it)
   for (const sp of active) {
     const dSport = duelSports.find(x => sp.duel.test(x.title || ''));
     let poly;
     try {
-      poly = (await polyEvents(sp.series)).map(e => parsePolyEvent(e, sp.id)).filter(g => !g.skip && g.markets.size && g.start <= horizon);
+      poly = mergePolyGames((await polyEvents(sp.series)).map(e => parsePolyEvent(e, sp)).filter(g => !g.skip && g.markets.size && g.start <= horizon));
     } catch (e) { log(`Polymarket ${sp.label}: ${e.message}`, 'error'); continue; }
     if (!poly.length) continue;
     if (!dSport || !dSport.events) { alone.push(...poly); continue; }
-    const evs = await api.events(dSport.key);
+    if (!duelLists.has(dSport.key)) duelLists.set(dSport.key, await api.events(dSport.key));
+    const evs = duelLists.get(dSport.key);
     state.eventOrder.set(dSport.key, evs.map(e => String(e.id)));
     const stubs = evs.map(e => duelEventStub(e)).filter(e => e && e.start <= horizon + 3 * 3600e3);
     const { pairs, doubt: d, unmatched } = matchGames(poly, stubs);
@@ -117,7 +141,8 @@ async function discover() {
     log(`${sp.label}: Polymarket ${poly.length}, Duel ${stubs.length}, пар ${pairs.length}${d.length ? `, под вопросом ${d.length}` : ''}`);
   }
   // keep the nearest pairs within the limit; carry Duel odds over for pairs we already track
-  const chosen = [...found.values()].sort((a, b) => a.poly.start - b.poly.start);
+  // esports first (the main focus), then by start time
+  const chosen = [...found.values()].sort((a, b) => (a.sp.profile !== 'esports') - (b.sp.profile !== 'esports') || a.poly.start - b.poly.start);
   const keep = chosen.slice(0, Math.max(1, S.maxDuelEvents | 0));
   if (chosen.length > keep.length) log(`Пар ${chosen.length}, слежу за ближайшими ${keep.length} (настройка «Не больше матчей Duel»)`, 'warn');
   const next = new Map();
@@ -149,7 +174,7 @@ async function refreshDuel(all = false) {
     const byId = new Map(full.filter(Boolean).map(e => [String(e.id), e]));
     for (const t of ts) {
       const raw = byId.get(t.duelStubId);
-      const d = raw && parseDuelEvent(raw);
+      const d = raw && parseDuelEvent(raw, Date.now(), t.sp.profile);
       t.duelAt = Date.now(); state.duelTickAt = t.duelAt;
       if (!d || d.skip) { t.duel = null; t.duelSkip = d?.skip || 'нет коэффициентов'; continue; }
       t.duel = d; t.duelSkip = null;
@@ -275,7 +300,7 @@ const when = d => d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', 
 const ago = ms => { const s = Math.round((Date.now() - ms) / 1000); return s < 60 ? `${s} с` : `${Math.round(s / 60)} мин`; };
 const allRows = () => [...state.tracked.values()].flatMap(t => t.rows.map(r => ({ ...r, t })));
 const isArb = r => r.arb && r.profitPct >= S.minProfit;
-const gameCell = r => `<div>${esc(r.poly.title)}</div><div class="sub">${when(r.poly.start)} · ${esc(r.poly.tournament || r.duel.tournament)}</div>`;
+const gameCell = r => `<div>${esc(r.poly.title)}</div><div class="sub">${when(r.poly.start)} · ${esc(r.poly.tournament || r.duel.tournament)}</div>${r.t?.sp?.risk ? `<span class="tag warn" title="${esc(r.t.sp.risk)}">риск: снятие игрока</span>` : ''}`;
 const openBtns = r => `<div class="go"><a class="btn-pm" href="${esc(r.poly.url)}" target="polymarket" rel="noopener">Polymarket ↗</a><a class="btn-duel" href="${esc(r.duel.url)}" target="duel" rel="noopener">Duel ↗</a></div>`;
 /** Duel line movement seen this session, and whether Duel lags behind Polymarket. */
 const moveNote = m => {

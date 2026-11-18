@@ -2,7 +2,9 @@
 // Strict on purpose: a wrong match produces fake arbs, a missed match only hides one game.
 
 // Words that say nothing about which team it is.
-const GENERIC = new Set(['team', 'esports', 'esport', 'e', 'sports', 'gaming', 'gg', 'club', 'the', 'clan', 'org', 'cs', 'dota', 'lol', 'gc']);
+const GENERIC = new Set(['team', 'esports', 'esport', 'e', 'sports', 'gaming', 'gg', 'club', 'the', 'clan', 'org', 'cs', 'dota', 'lol', 'gc',
+  // football / basketball / hockey club prefixes and suffixes
+  'fc', 'cf', 'afc', 'sc', 'ac', 'cd', 'sv', 'fk', 'bk', 'sk', 'if', 'ik', 'calcio', 'ssc', 'rc', 'vfb', 'vfl', 'tsg', 'bc', 'hc', 'ud', 'sd']);
 
 // Words that turn a team into a DIFFERENT team (academy, second roster, women's roster...).
 export const ROSTER_WORDS = new Set([
