@@ -67,12 +67,16 @@ export function toPolyFrame(m, perm) {
 
 /* ---------------------------------- arbs ---------------------------------- */
 
+const levelsOf = list => (list || []).map(a => ({ price: +a.price, size: +a.size })).filter(a => a.price > 0 && a.size > 0);
+/** books: Map(token -> { asks, bids }) — a bare asks array is accepted too. */
+const sideOf = (books, token, side) => { const b = books?.get(token); return !b ? null : Array.isArray(b) ? (side === 'asks' ? b : null) : b[side]; };
+
 /**
  * Best ask and the book on the way up for one Polymarket token.
- * books: Map(token -> asks[{price,size}]); falls back to the Gamma top of book (no depth).
+ * Falls back to the Gamma top of book (no depth) when the order book is missing.
  */
 function askOf(leg, books) {
-  const asks = books?.get(leg.token);
+  const asks = sideOf(books, leg.token, 'asks');
   if (asks) {
     const levels = asks.map(a => ({ price: +a.price, size: +a.size })).filter(a => a.price > 0 && a.size > 0).sort((a, b) => a.price - b.price);
     return levels.length ? { price: levels[0].price, levels, fromBook: true } : null;
@@ -93,7 +97,6 @@ const sideLabel = (m, teams, i) => {
 export function comparePair(pair, books, s = {}, now = Date.now()) {
   const { poly, duel, perm } = pair;
   const minPrice = s.minPrice ?? 0.03, maxPrice = s.maxPrice ?? 0.97;
-  const stale = duel.updated && s.maxAgeMin ? now - new Date(duel.updated).getTime() > s.maxAgeMin * 60e3 : false;
   const duelMarkets = new Map([...duel.markets.values()].map(m => toPolyFrame(m, perm)).map(m => [m.key, m]));
   const out = [];
   for (const pm of poly.markets.values()) {
@@ -108,8 +111,9 @@ export function comparePair(pair, books, s = {}, now = Date.now()) {
         pSide: sideLabel(pm, poly.teams, i), dSide: sideLabel(pm, poly.teams, 1 - i),
         polyLeg: { ...pLeg, price: ask.price, fromBook: ask.fromBook },
         duelLeg: { ...dLeg },
-        qPoly: polyCost(ask.price, pLeg.fee, s.extraPolyPct), qDuel: 1 / dLeg.price, stale,
+        qPoly: polyCost(ask.price, pLeg.fee, s.extraPolyPct), qDuel: 1 / dLeg.price,
       };
+      const stale = isStale(dLeg.updated || duel.updated, s.maxAgeMin, now);
       row.sum = row.qPoly + row.qDuel;
       row.profitPct = (1 / row.sum - 1) * 100;
       row.problems = [];
@@ -129,6 +133,77 @@ export function comparePair(pair, books, s = {}, now = Date.now()) {
  * Stakes for a bankroll, and how much the Polymarket book takes while the arb still gives `minProfit`.
  * Buying N shares on Polymarket pays N if that side wins; the Duel stake is N / odds.
  */
+export function isStale(updated, maxAgeMin, now = Date.now()) {
+  if (!updated || !maxAgeMin) return false;
+  return now - new Date(updated).getTime() > maxAgeMin * 60e3;
+}
+
+/* ------------------------------- value bets -------------------------------- */
+
+/**
+ * Fair probability of each side of a Polymarket market: the middle of the book, fee left out.
+ * Side 1 is the mirror of side 0 (buying side 1 = selling side 0), so both mids are averaged.
+ * Returns { p:[p0,p1], spread, bid, ask } or null when there is no two-sided book.
+ */
+export function fairFromBooks(pm, books) {
+  const top = i => {
+    const asks = levelsOf(sideOf(books, pm.outs[i].token, 'asks')), bids = levelsOf(sideOf(books, pm.outs[i].token, 'bids'));
+    if (!asks.length || !bids.length) return null;
+    const ask = Math.min(...asks.map(a => a.price)), bid = Math.max(...bids.map(b => b.price));
+    const depth = Math.min(asks.find(a => a.price === ask).size * ask, bids.find(b => b.price === bid).size * bid);
+    return ask > bid ? { ask, bid, mid: (ask + bid) / 2, spread: ask - bid, depth } : null;
+  };
+  const t0 = top(0), t1 = top(1);
+  const c = [t0 && t0.mid, t1 && 1 - t1.mid].filter(x => x != null);
+  if (!c.length) return null;
+  const p0 = c.reduce((a, b) => a + b, 0) / c.length;
+  const spread = Math.min(...[t0, t1].filter(Boolean).map(t => t.spread));
+  const depth = Math.max(...[t0, t1].filter(Boolean).map(t => t.depth)); // USD at the best bid / ask
+  // bid / ask of each side; a side without its own book is the mirror of the other one
+  const quote = i => { const t = i ? t1 : t0, o = i ? t0 : t1; return t ? { bid: t.bid, ask: t.ask } : { bid: 1 - o.ask, ask: 1 - o.bid }; };
+  return { p: [p0, 1 - p0], spread, depth, tops: [t0, t1], quote: [quote(0), quote(1)] };
+}
+
+/**
+ * Duel bets priced above Polymarket's fair line. EV = p * odds - 1; stake = fractional Kelly of the bank.
+ * Problems (wide spread, near-resolved market, stale odds) keep a row out of the list but visible.
+ */
+export function valueBets(pair, books, s = {}, now = Date.now()) {
+  const { poly, duel, perm } = pair;
+  const maxSpread = s.maxSpread ?? 0.04, minP = s.minFairP ?? 0.05;
+  const duelMarkets = new Map([...duel.markets.values()].map(m => toPolyFrame(m, perm)).map(m => [m.key, m]));
+  const out = [];
+  for (const pm of poly.markets.values()) {
+    const dm = duelMarkets.get(pm.key);
+    if (!dm) continue;
+    const fair = fairFromBooks(pm, books);
+    for (const i of [0, 1]) {
+      const dLeg = dm.outs[i];
+      if (!dLeg) continue;
+      const row = {
+        id: `v|${poly.id}|${pm.key}|${i}`, poly, duel, market: pm, label: marketLabel(pm),
+        i, side: sideLabel(pm, poly.teams, i), duelLeg: { ...dLeg }, fair, problems: [],
+      };
+      if (!fair) { row.problems.push('нет двустороннего стакана Polymarket'); out.push(row); continue; }
+      row.p = fair.p[i];
+      row.fairOdds = 1 / row.p;
+      row.ev = row.p * dLeg.price - 1;
+      row.evPct = row.ev * 100;
+      if (fair.spread > maxSpread) row.problems.push(`спред Polymarket ${fair.spread.toFixed(3)} — цена ненадёжна`);
+      const minDepth = s.minDepthUsd ?? 20;
+      if (fair.depth < minDepth) row.problems.push(`в стакане Polymarket у лучших цен меньше ${minDepth} $`);
+      if (row.p < minP || row.p > 1 - minP) row.problems.push('рынок почти решён');
+      if (isStale(dLeg.updated || duel.updated, s.maxAgeMin, now)) row.problems.push(`коэффициент Duel старше ${s.maxAgeMin} мин`);
+      const kelly = row.ev > 0 ? row.ev / (dLeg.price - 1) : 0;
+      row.kelly = kelly;
+      row.stake = (s.valueBank ?? 1000) * (s.kellyFraction ?? 0.25) * kelly;
+      row.value = row.ev > 0 && row.evPct >= (s.minEV ?? 3) && !row.problems.length;
+      out.push(row);
+    }
+  }
+  return out;
+}
+
 export function sizing(row, levels, s = {}) {
   const bank = s.bankroll ?? 100;
   const payout = bank / row.sum;
