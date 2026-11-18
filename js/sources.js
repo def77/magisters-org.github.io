@@ -32,8 +32,11 @@ export function parseDate(s) {
   return isNaN(d) ? null : d;
 }
 
-const BAD_Q = /spread|o\/u|over|under|total|handicap|half|1h|2h|quarter|period|by \d|exact|score|both teams|corners|cards|first|points|rebounds|assists|yards|map \d|set \d/i;
+const BAD_Q = /\b(spread|o\/u|over|under|totals?|handicap|half|1h|2h|quarter|period|by \d|exact|score|both teams|corners|cards|first|points|rebounds|assists|yards|map \d|set \d|game \d)\b/i;
 const YESNO = o => o.length === 2 && /^yes$/i.test(o[0]) && /^no$/i.test(o[1]);
+// sportsMarketType is authoritative when Gamma provides it; the question regex is only a fallback.
+const isMoneyline = m => (m.sportsMarketType ? m.sportsMarketType === 'moneyline' : !BAD_Q.test(m.question || ''));
+const feeOf = m => (m.feesEnabled && m.feeSchedule ? { rate: +m.feeSchedule.rate || 0, exponent: +m.feeSchedule.exponent || 1 } : null);
 
 /** Convert a Gamma event into our unified Polymarket game, or null if it isn't a single game. */
 export function parsePolyEvent(ev, sport) {
@@ -52,8 +55,7 @@ export function parsePolyEvent(ev, sport) {
   const ml = markets.find(m => {
     const o = parseArr(m.outcomes);
     if (o.length !== 2 || YESNO(o)) return false;
-    if (m.sportsMarketType) return m.sportsMarketType === 'moneyline';
-    return !BAD_Q.test(m.question || '') && !/^(over|under)$/i.test(o[0]);
+    return isMoneyline(m) && !/^(over|under)$/i.test(o[0]);
   });
   if (ml && sport.outcomes === 2) {
     const names = parseArr(ml.outcomes);
@@ -65,8 +67,8 @@ export function parsePolyEvent(ev, sport) {
     return {
       ...base, kind: 'moneyline',
       outcomes: [
-        { name: names[0], yes: leg(ask0, tokens[0], ml), no: null },
-        { name: names[1], yes: leg(ask1, tokens[1], ml), no: null },
+        { name: names[0], yes: leg(ask0, tokens[0], ml, bid0), no: null },
+        { name: names[1], yes: leg(ask1, tokens[1], ml, ask0 != null ? 1 - ask0 : null), no: null },
       ],
     };
   }
@@ -74,9 +76,8 @@ export function parsePolyEvent(ev, sport) {
   // 2) Yes/No markets per outcome: "Will Arsenal win?", "Draw?", "Will Chelsea win?"
   const yn = markets.filter(m => {
     if (!YESNO(parseArr(m.outcomes))) return false;
-    if (m.sportsMarketType && m.sportsMarketType !== 'moneyline') return false;
     const q = (m.question || '') + ' ' + (m.groupItemTitle || '');
-    return /win|draw|tie/i.test(q) && !BAD_Q.test(m.question || '');
+    return isMoneyline(m) && /win|draw|tie/i.test(q);
   });
   if (yn.length === sport.outcomes) {
     const outs = yn.map(m => {
@@ -88,7 +89,7 @@ export function parsePolyEvent(ev, sport) {
       let name = m.groupItemTitle || (m.question || '').replace(/^will\s+/i, '').replace(/\s+win.*$/i, '');
       if (/draw|tie/i.test(m.question || '') && !m.groupItemTitle) name = 'Draw';
       if (/^draw|^tie/i.test(name)) name = 'Draw';
-      return { name, yes: leg(ask, tokens[0], m), no: leg(noAsk, tokens[1], m) };
+      return { name, yes: leg(ask, tokens[0], m, bid), no: leg(noAsk, tokens[1], m, ask != null ? 1 - ask : null) };
     });
     if (sport.outcomes === 3 && !outs.some(o => o.name === 'Draw')) return null;
     return { ...base, kind: sport.outcomes === 3 ? '1x2' : 'moneyline', outcomes: outs };
@@ -97,20 +98,32 @@ export function parsePolyEvent(ev, sport) {
 }
 
 const num = v => (v === undefined || v === null || v === '' || isNaN(+v) ? null : +v);
-const leg = (ask, token, m) => ({ ask: num(ask), token, marketId: m.id, minSize: num(m.orderMinSize) });
+const r4 = x => (x == null ? null : Math.round(x * 1e4) / 1e4);
+// bid = best price someone pays for this outcome now (for limit orders); tick = price step
+const leg = (ask, token, m, bid = null) => ({ ask: r4(num(ask)), bid: r4(num(bid)), tick: num(m.orderPriceMinTickSize) || 0.01, token, marketId: m.id, minSize: num(m.orderMinSize), fee: feeOf(m) });
 
-export async function fetchPolymarket(sport, proxy, log) {
+/** Raw Gamma events for one Polymarket series that have not finished yet. */
+export async function fetchGammaEvents(sport, proxy, hoursAhead = 48) {
+  const now = Date.now();
+  const min = new Date(now - 3 * 3600e3).toISOString().slice(0, 19) + 'Z';
   const out = [];
-  for (let offset = 0; offset < 600; offset += 200) {
-    const url = `${GAMMA}/events?tag_slug=${encodeURIComponent(sport.poly)}&active=true&closed=false&limit=200&offset=${offset}`;
+  for (let offset = 0; offset < 1000; offset += 200) {
+    const url = `${GAMMA}/events?series_id=${sport.series}&closed=false&end_date_min=${min}&limit=200&offset=${offset}`;
     const { data } = await getJSON(url, proxy);
     const list = Array.isArray(data) ? data : (data.data || data.events || []);
-    for (const ev of list) {
-      const g = parsePolyEvent(ev, sport);
-      if (g) out.push(g);
-    }
+    out.push(...list);
     if (list.length < 200) break;
   }
+  const horizon = now + hoursAhead * 3600e3;
+  return out.filter(ev => {
+    const t = parseDate(ev.startTime) || parseDate(ev.markets?.[0]?.gameStartTime);
+    return !t || t.getTime() <= horizon;
+  });
+}
+
+export async function fetchPolymarket(sport, proxy, log, hoursAhead) {
+  const events = await fetchGammaEvents(sport, proxy, hoursAhead);
+  const out = events.map(ev => parsePolyEvent(ev, sport)).filter(Boolean);
   log?.(`Polymarket ${sport.label}: ${out.length} матчей`);
   return out;
 }
