@@ -107,7 +107,7 @@ export function comparePair(pair, books, s = {}, now = Date.now()) {
       const ask = askOf(pLeg, books);
       if (!ask || !dLeg) continue;
       const row = {
-        id: `${poly.id}|${pm.key}|${i}`, poly, duel, market: pm, label: marketLabel(pm), score: pair.score,
+        id: `${poly.id}|${pm.key}|${i}`, pi: i, poly, duel, market: pm, label: marketLabel(pm), score: pair.score,
         pSide: sideLabel(pm, poly.teams, i), dSide: sideLabel(pm, poly.teams, 1 - i),
         polyLeg: { ...pLeg, price: ask.price, fromBook: ask.fromBook },
         duelLeg: { ...dLeg },
