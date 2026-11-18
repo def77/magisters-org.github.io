@@ -30,6 +30,9 @@ export async function polyEvents(seriesId) {
   return out;
 }
 
+/** One Gamma market (free): used to settle the journal from Polymarket's own resolution. */
+export const polyMarket = id => getJSON(`${GAMMA}/markets/${id}`);
+
 /** CLOB order books: Map(token -> { asks, bids }). */
 export async function polyBooks(tokens) {
   const map = new Map();

@@ -69,6 +69,7 @@
         <button class="tab" data-tab="values">Валуйки <span id="nValues" class="badge">0</span></button>
         <button class="tab" data-tab="all">Все сравнения <span id="nAll" class="badge">0</span></button>
         <button class="tab" data-tab="games">Матчи <span id="nGames" class="badge">0</span></button>
+        <button class="tab" data-tab="journal">Журнал <span id="nJournal" class="badge">0</span></button>
         <button class="tab" data-tab="log">Лог</button>
       </nav>
 
@@ -105,6 +106,16 @@
         <table class="grid"><thead><tr><th>Начало</th><th>Polymarket</th></tr></thead><tbody id="aloneBody"></tbody></table>
       </section>
 
+      <section id="tab-journal" class="panel hidden">
+        <div class="jhead"><div id="jSummary" class="jsummary"></div>
+          <div><button id="jSettle" class="small">Проверить результаты</button> <button id="jCsv" class="small">Скачать CSV</button></div></div>
+        <p class="note">Результат берётся из закрытия рынка Polymarket — того самого, по которому шло сравнение (бесплатно, проверка раз в 10 минут). Если Duel рассчитал иначе (например, вернул ставку при снятии теннисиста) — поправьте вручную. CLV — насколько взятый кэф Duel лучше справедливой цены Polymarket перед началом. Журнал хранится в этом браузере.</p>
+        <table class="grid">
+          <thead><tr><th>Записано</th><th>Матч</th><th>Рынок</th><th>Ставки</th><th>Результат</th><th>Прибыль</th><th></th></tr></thead>
+          <tbody id="journalBody"></tbody>
+        </table>
+      </section>
+
       <section id="tab-log" class="panel hidden"><pre id="log"></pre></section>
     </main>
   </div>
@@ -120,6 +131,7 @@
       <label>Сумма, $ <input id="cAmount" type="number" min="1" step="1"></label>
       <label>Округлить ставку Duel до <select id="cRound"><option value="0">не округлять</option><option value="1">$1</option><option value="5">$5</option><option value="10">$10</option></select></label>
       <button id="cReset" class="small" title="Вернуть текущие цены из сканера">Текущие цены</button>
+      <button id="cJournal" class="small" title="Записать вилку с суммами из калькулятора">В журнал</button>
     </div>
     <div id="cOut"></div>
     <div id="cGo"></div>

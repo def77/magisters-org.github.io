@@ -1,4 +1,5 @@
-import { DuelApi, polyEvents, polyBooks } from './api.js';
+import { DuelApi, polyEvents, polyBooks, polyMarket } from './api.js';
+import { loadJournal, saveJournal, arbEntry, valueEntry, resultFromMarket, entryPnl, entryClv, journalStats, resultLabel, toCSV } from './journal.js';
 import { parsePolyEvent, parseDuelEvent, duelEventStub, mergePolyGames } from './markets.js';
 import { matchGames, comparePair, valueBets, toPolyFrame } from './compare.js';
 import { PolyStream } from './live.js';
@@ -57,6 +58,7 @@ const state = {
   tracked: new Map(), // poly id -> { sp, dSport, poly, duel, perm, score, dtMin, duelAt, rows, best }
   doubt: [], alone: [], restBooks: new Map(), eventOrder: new Map(),
   live: false, busy: false, discoverAt: 0, tick: null,
+  journal: loadJournal(), journalDirty: false, settling: false,
   spent: 0, liveSince: 0, liveBase: 0, creditsLeft: null, calcId: null, calcEdited: false, seen: new Map(),
 };
 let api = null;
@@ -220,6 +222,14 @@ function recompute(t) {
   for (const v of t.values) if (v.fair && v.i === 0) t.log.fairP(v.market.key, v.fair.p[0], now);
   for (const v of t.values) v.move = t.log.signal(v.market.key, v.i, now, opt);
   for (const r of t.rows) r.move = t.log.signal(r.market.key, 1 - r.pi, now, opt);
+  // closing line for journal entries of this game: the last Duel price and fair line before the start
+  for (const e of state.journal) {
+    if (e.result || e.polyKey !== t.poly.id || now >= e.start) continue;
+    const dm = [...t.duel.markets.values()].map(m => toPolyFrame(m, t.perm)).find(m => m.key === e.marketKey);
+    const odds = dm?.outs[e.duelIdx]?.price;
+    const v = t.values.find(x => x.market.key === e.marketKey && x.i === e.duelIdx && x.fair);
+    if (odds) { e.close = { odds, fairP: v ? v.p : e.close?.fairP ?? null, at: now }; state.journalDirty = true; }
+  }
   const clean = t.rows.filter(r => !r.problems.length);
   t.best = clean.length ? Math.min(...clean.map(r => r.sum)) : null;
 }
@@ -349,7 +359,7 @@ function render() {
           поставить ${copy(r.duelStake.toFixed(2), `<b>${usd(r.duelStake)}</b>`)}
           <div class="sub">кэф получен ${ago(r.t.duelAt)} назад${isHot(r.t) && state.live ? ` · обновляю каждые ${S.duelHotSec} с` : ''}</div>${moveNote(r.move)}</td>
       <td>${r.maxBank != null ? `до <b>${usd(r.maxBank)}</b><div class="sub">${r.maxShares.toFixed(0)} акций в стакане</div>${r.bankTooBig ? '<span class="tag warn">банк больше стакана</span>' : ''}` : '—'}
-          <div><button class="small calc-open" data-id="${esc(r.id)}">Калькулятор</button></div></td>
+          <div><button class="small calc-open" data-id="${esc(r.id)}">Калькулятор</button> <button class="small j-arb" data-id="${esc(r.id)}" title="Записать вилку с суммами для банка из настроек">В журнал</button></div></td>
     </tr>`).join('') : `<tr><td colspan="6" class="empty">${rows.length ? 'Вилок нет. Ближайшие к вилке — во вкладке «Все сравнения».' : 'Нажмите «Сканировать» или включите реал-тайм.'}</td></tr>`;
 
   $('#valueBody').innerHTML = values.length ? values.map(v => {
@@ -363,7 +373,8 @@ function render() {
           <div class="sub">кэф получен ${ago(v.t.duelAt)} назад</div>${moveNote(v.move)}</td>
       <td>${(v.p * 100).toFixed(1)}% → кэф <b>${v.fairOdds.toFixed(2)}</b>
           <div class="sub">Polymarket ${esc(v.side)}: ${top.bid.toFixed(3)} / ${top.ask.toFixed(3)}, спред ${f.spread.toFixed(3)}</div></td>
-      <td>${copy(v.stake.toFixed(2), `<b>${usd(v.stake)}</b>`)}<div class="sub">${(S.kellyFraction * 100).toFixed(0)}% Келли от ${usd(S.valueBank)}</div></td>
+      <td>${copy(v.stake.toFixed(2), `<b>${usd(v.stake)}</b>`)}<div class="sub">${(S.kellyFraction * 100).toFixed(0)}% Келли от ${usd(S.valueBank)}</div>
+          <button class="small j-val" data-id="${esc(v.id)}">В журнал</button></td>
     </tr>`;
   }).join('') : `<tr><td colspan="6" class="empty">${rows.length ? `Валуек от ${S.minEV}% нет.` : 'Нажмите «Сканировать» или включите реал-тайм.'}</td></tr>`;
 
@@ -389,6 +400,8 @@ function render() {
       <td>${when(g.start)}</td><td><a href="${esc(g.url)}" target="polymarket" rel="noopener">${esc(g.title)}</a></td></tr>`).join('') : '<tr><td colspan="2" class="empty">—</td></tr>';
   renderCalc();
   renderCredits();
+  if (state.journalDirty) { state.journalDirty = false; saveJournal(state.journal); }
+  renderJournal();
 }
 
 /* ------------------------------- calculator ------------------------------- */
@@ -411,7 +424,7 @@ function renderCalc() {
   $('#cTitle').textContent = `${base.poly.title} — ${base.label}`;
   $('#cSides').innerHTML = `<span class="tag poly">Polymarket</span>${esc(base.pSide)} &nbsp; <span class="tag duel">Duel</span>${esc(base.duelLeg.label)}${!r ? ' <span class="tag warn">матч пропал из сканера</span>' : !r.arb ? ' <span class="tag warn">сейчас не вилка</span>' : ''}`;
   $('#cGo').innerHTML = openBtns(base);
-  const res = calcArb({
+  const res = state.calcRes = calcArb({
     price: +$('#cPrice').value, fee: base.polyLeg.fee, extraPct: S.extraPolyPct, odds: +$('#cOdds').value,
     mode: $('#cMode').value, amount: +$('#cAmount').value, roundDuel: +$('#cRound').value,
   });
@@ -426,6 +439,59 @@ function renderCalc() {
     </div>` : '<p class="sub">Проверьте цену (0–1) и кэф (> 1).</p>';
 }
 
+/* --------------------------------- journal -------------------------------- */
+function journalAdd(e) {
+  state.journal.unshift(e);
+  const t = state.tracked.get(e.polyKey);
+  if (t) recompute(t); // fills the closing line right away; later scans keep it current until the start
+  saveJournal(state.journal); renderJournal();
+  log(`В журнал: ${e.kind === 'arb' ? 'вилка' : 'валуйка'} — ${e.title}, ${e.label}`, 'ok');
+}
+/** Settle open entries from Polymarket's resolution (free). Runs on load, every 10 min and by the button. */
+async function settleJournal(force = false) {
+  if (state.settling) return;
+  state.settling = true;
+  let n = 0;
+  try {
+    for (const e of state.journal) {
+      if ((e.result && e.result !== 'half') || e.manual) continue;
+      if (!force && Date.now() < e.start + 30 * 60e3) continue;
+      try {
+        const r = resultFromMarket(e, await polyMarket(e.marketId));
+        if (r && r !== e.result) { e.result = r; n++; }
+      } catch (err) { log(`Журнал: ${e.title} — ${err.message}`, 'warn'); }
+    }
+  } finally { state.settling = false; }
+  if (n) { saveJournal(state.journal); log(`Журнал: рассчитано ставок — ${n}`, 'ok'); }
+  renderJournal();
+  return n;
+}
+const pct = x => (x == null ? '—' : `${x >= 0 ? '+' : ''}${x.toFixed(1)}%`);
+function renderJournal() {
+  const list = state.journal;
+  $('#nJournal').textContent = list.filter(e => !e.result).length || list.length;
+  const st = journalStats(list);
+  const card = (name, s) => `<div class="jcard"><div class="sub">${name}</div><b class="${s.pnl >= 0 ? 'pos' : 'neg'}">${s.pnl >= 0 ? '+' : ''}${usd(s.pnl)}</b>
+      <div class="sub">ставок ${s.count} · ждут ${s.open} · ROI ${pct(s.roi)}${s.clv != null ? ` · CLV ${pct(s.clv)}` : ''}</div></div>`;
+  $('#jSummary').innerHTML = card('Вилки', st.arb) + card('Валуйки', st.value);
+  const opts = e => (e.kind === 'arb' ? ['', 'poly', 'duel', 'duel-void-poly-won', 'duel-void-poly-lost', 'void'] : ['', 'won', 'lost', 'void'])
+    .map(r => `<option value="${r}" ${(e.result || '') === r ? 'selected' : ''}>${r ? resultLabel(r) : 'ожидает'}</option>`).join('');
+  $('#journalBody').innerHTML = list.length ? list.map(e => {
+    const pnl = entryPnl(e), clv = entryClv(e);
+    return `<tr>
+      <td>${when(new Date(e.ts))}<div class="sub">${e.kind === 'arb' ? 'вилка' : 'валуйка'}</div></td>
+      <td>${esc(e.title)}<div class="sub">${when(new Date(e.start))}</div><div class="go"><a class="btn-pm" href="${esc(e.polyUrl)}" target="polymarket" rel="noopener">Polymarket ↗</a><a class="btn-duel" href="${esc(e.duelUrl)}" target="duel" rel="noopener">Duel ↗</a></div></td>
+      <td>${esc(e.label)}</td>
+      <td>${e.poly ? `<span class="tag poly">PM</span>${esc(e.poly.side)} ${e.poly.price.toFixed(3)} · ${e.poly.shares.toFixed(1)} акций · ${usd(e.poly.usd)}<br>` : ''}
+          <span class="tag duel">Duel</span>${esc(e.duel.label)} @${e.duel.odds} · ${usd(e.duel.stake)}
+          ${e.close ? `<div class="sub">закрытие Duel @${e.close.odds}${e.close.fairP ? `, справедливо ${(1 / e.close.fairP).toFixed(2)}` : ''}</div>` : ''}</td>
+      <td><select class="j-res" data-id="${e.id}">${opts(e)}</select>${e.manual ? '<div class="sub">вручную</div>' : ''}</td>
+      <td class="${pnl == null ? '' : pnl >= 0 ? 'pos' : 'neg'}"><b>${pnl == null ? '—' : (pnl >= 0 ? '+' : '') + usd(pnl)}</b>${clv != null ? `<div class="sub">CLV ${pct(clv)}</div>` : ''}</td>
+      <td><button class="small j-del" data-id="${e.id}" title="Удалить запись">✕</button></td>
+    </tr>`;
+  }).join('') : '<tr><td colspan="7" class="empty">Пусто. Кнопка «В журнал» — у вилки, валуйки и в калькуляторе.</td></tr>';
+}
+
 /* ---------------------------------- wire ---------------------------------- */
 $$('.tab').forEach(b => b.addEventListener('click', () => {
   $$('.tab').forEach(x => x.classList.toggle('active', x === b));
@@ -437,6 +503,34 @@ document.addEventListener('click', e => {
   if (c) { navigator.clipboard?.writeText(c.dataset.copy); c.classList.add('copied'); setTimeout(() => c.classList.remove('copied'), 800); }
   const o = e.target.closest('.calc-open');
   if (o) openCalc(o.dataset.id);
+  const ja = e.target.closest('.j-arb');
+  if (ja) { const r = findRow(ja.dataset.id); if (r) journalAdd(arbEntry(r)); }
+  const jv = e.target.closest('.j-val');
+  if (jv) {
+    const v = [...state.tracked.values()].flatMap(t => t.values || []).find(x => x.id === jv.dataset.id);
+    if (v) journalAdd(valueEntry(v));
+  }
+  const jd = e.target.closest('.j-del');
+  if (jd && confirm('Удалить запись из журнала?')) { state.journal = state.journal.filter(x => x.id !== jd.dataset.id); saveJournal(state.journal); renderJournal(); }
+});
+document.addEventListener('change', e => {
+  const s = e.target.closest('.j-res');
+  if (!s) return;
+  const entry = state.journal.find(x => x.id === s.dataset.id);
+  if (!entry) return;
+  entry.result = s.value || null; entry.manual = !!s.value;
+  saveJournal(state.journal); renderJournal();
+});
+$('#cJournal').addEventListener('click', () => {
+  const base = state.calcLast, res = state.calcRes;
+  if (!base || !res) return;
+  journalAdd(arbEntry(base, { shares: res.shares, polyUsd: res.polyUsd, duelStake: res.duelStake, price: +$('#cPrice').value, odds: +$('#cOdds').value }));
+});
+$('#jSettle').addEventListener('click', async () => { const n = await settleJournal(true); log(n ? `Журнал: рассчитано ${n}` : 'Журнал: новых результатов нет'); });
+$('#jCsv').addEventListener('click', () => {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\ufeff' + toCSV(state.journal)], { type: 'text/csv;charset=utf-8' }));
+  a.download = `journal-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
 });
 $('#scanBtn').addEventListener('click', fullScan);
 $('#liveBtn').addEventListener('click', () => (state.live ? stopLive() : startLive()));
@@ -445,5 +539,7 @@ $('#calcClose').addEventListener('click', () => { $('#calc').hidden = true; stat
 ['#cMode', '#cAmount', '#cRound'].forEach(s => $(s).addEventListener('input', renderCalc));
 $('#cReset').addEventListener('click', () => { state.calcEdited = false; renderCalc(); });
 setInterval(() => { if (state.tracked.size) render(); }, 15000); // keep "N s ago" fresh
+setInterval(() => settleJournal(), 10 * 60e3);
 fillForm();
 render();
+settleJournal();
