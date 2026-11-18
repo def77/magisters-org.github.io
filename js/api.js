@@ -30,7 +30,7 @@ export async function polyEvents(seriesId) {
   return out;
 }
 
-/** CLOB order books: Map(token -> asks). */
+/** CLOB order books: Map(token -> { asks, bids }). */
 export async function polyBooks(tokens) {
   const map = new Map();
   const uniq = [...new Set(tokens.filter(Boolean))];
@@ -40,7 +40,7 @@ export async function polyBooks(tokens) {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(chunk.map(t => ({ token_id: t }))),
     });
-    for (const b of data || []) map.set(b.asset_id, b.asks || []);
+    for (const b of data || []) map.set(b.asset_id, { asks: b.asks || [], bids: b.bids || [] });
   }
   return map;
 }

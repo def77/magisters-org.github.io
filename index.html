@@ -40,6 +40,14 @@
         <label>Доп. комиссия Polymarket, % <input id="extraPolyPct" type="number" min="0" step="0.1" title="Поверх комиссии рынка (она учитывается сама)"></label>
       </section>
       <section>
+        <h3>Валуйки</h3>
+        <label>EV от, % <input id="minEV" type="number" min="0" step="0.5"></label>
+        <label>Спред Polymarket до <input id="maxSpread" type="number" min="0.005" step="0.005" title="Шире — цена Polymarket ненадёжна как справедливая"></label>
+        <label>Объём у лучших цен от, $ <input id="minDepthUsd" type="number" min="0" step="10" title="Тонкий стакан легко сдвинуть — такая цена не справедливая"></label>
+        <label>Банк для валуек, $ <input id="valueBank" type="number" min="10" step="50"></label>
+        <label>Доля Келли <input id="kellyFraction" type="number" min="0.05" max="1" step="0.05" title="0.25 — четверть Келли: безопаснее при ошибках в оценке"></label>
+      </section>
+      <section>
         <h3>Расход кредитов</h3>
         <label>Матчи в ближайшие, ч <input id="horizonH" type="number" min="1" step="1"></label>
         <label>Не больше матчей Duel за скан <input id="maxDuelEvents" type="number" min="1" step="1" title="Каждый матч — 5–10 кредитов"></label>
@@ -57,6 +65,7 @@
     <main>
       <nav class="tabs">
         <button class="tab active" data-tab="arbs">Вилки <span id="nArbs" class="badge">0</span></button>
+        <button class="tab" data-tab="values">Валуйки <span id="nValues" class="badge">0</span></button>
         <button class="tab" data-tab="all">Все сравнения <span id="nAll" class="badge">0</span></button>
         <button class="tab" data-tab="games">Матчи <span id="nGames" class="badge">0</span></button>
         <button class="tab" data-tab="log">Лог</button>
@@ -67,6 +76,14 @@
         <table class="grid">
           <thead><tr><th>Профит</th><th>Матч</th><th>Рынок</th><th>Polymarket — купить</th><th>Duel — поставить</th><th>Лимит</th></tr></thead>
           <tbody id="arbBody"></tbody>
+        </table>
+      </section>
+
+      <section id="tab-values" class="panel hidden">
+        <p class="note">Ставки на Duel дороже справедливой цены Polymarket (середина стакана, без комиссии). Это <b>не вилка</b>: выигрыш не гарантирован, плюс получается на дистанции. Сумма — доля Келли от банка из настроек. Рынки с широким спредом на Polymarket отброшены.</p>
+        <table class="grid">
+          <thead><tr><th>EV</th><th>Матч</th><th>Рынок</th><th>Duel — поставить</th><th>Справедливо по Polymarket</th><th>Сумма</th></tr></thead>
+          <tbody id="valueBody"></tbody>
         </table>
       </section>
 

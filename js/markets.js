@@ -145,6 +145,8 @@ export function parseDuelEvent(ev, now = Date.now()) {
     if (!spec) continue;
     const outs = m.outcomes || [];
     if (outs.length !== 2 || outs.some(o => !(o.price > 1))) continue;
+    const upd = m.last_update || book.last_update || null;
+    const extra = o => ({ open: num(o.open_price), move: num(o.move), updated: upd });
     let line = 0;
     const sides = [];
     if (spec.kind === 'total') {
@@ -153,10 +155,10 @@ export function parseDuelEvent(ev, now = Date.now()) {
       for (const o of outs) {
         const g = String(o.name).trim().match(/^(over|under)\s+([\d.]+)$/i);
         if (!g || Math.abs(+g[2] - line) > 1e-9) continue;
-        sides[/^over$/i.test(g[1]) ? 0 : 1] = { price: +o.price, label: o.name };
+        sides[/^over$/i.test(g[1]) ? 0 : 1] = { price: +o.price, label: o.name, ...extra(o) };
       }
     } else {
-      const parsed = outs.map(o => ({ ...splitLine(o.name), price: +o.price, label: o.name }));
+      const parsed = outs.map(o => ({ ...splitLine(o.name), price: +o.price, label: o.name, ...extra(o) }));
       const idx = parsed.map(p => teams.indexOf(p.name));
       if (idx.includes(-1) || idx[0] === idx[1]) continue; // outcomes must be exactly the two teams
       if (spec.kind === 'hcp') {
@@ -164,7 +166,7 @@ export function parseDuelEvent(ev, now = Date.now()) {
         if (l.some(x => !isHalf(x)) || Math.abs(l[0] + l[1]) > 1e-9) continue; // must be +x / -x
         line = idx[0] === 0 ? l[0] : l[1];
       }
-      parsed.forEach((p, i) => { sides[idx[i]] = { price: p.price, label: p.label }; });
+      parsed.forEach((p, i) => { sides[idx[i]] = { price: p.price, label: p.label, open: p.open, move: p.move, updated: p.updated }; });
     }
     if (!sides[0] || !sides[1]) continue;
     const key = marketKey(spec.kind, spec.scope, spec.unit, line);

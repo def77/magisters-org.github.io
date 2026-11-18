@@ -19,6 +19,7 @@ export class Book {
   }
   /** Asks cheapest first, in the shape the REST /books endpoint returns. */
   askLevels() { return [...this.asks].sort((a, b) => a[0] - b[0]).map(([price, size]) => ({ price, size })); }
+  bidLevels() { return [...this.bids].sort((a, b) => b[0] - a[0]).map(([price, size]) => ({ price, size })); }
 }
 
 /** Apply one WebSocket message (object or array) to a Map(token -> Book). Returns the tokens that changed. */
@@ -87,6 +88,6 @@ export class PolyStream {
     ws.onerror = () => { try { ws.close(); } catch {} };
   }
   stop() { this.closed = true; clearInterval(this.ping); try { this.ws?.close(); } catch {} this.ws = null; this.onStatus('off'); }
-  /** Map(token -> asks) for compare.js, only for books we hold a snapshot of. */
-  asks() { return new Map([...this.books].map(([t, b]) => [t, b.askLevels()])); }
+  /** Map(token -> { asks, bids }) for compare.js, only for books we hold a snapshot of. */
+  levels() { return new Map([...this.books].map(([t, b]) => [t, { asks: b.askLevels(), bids: b.bidLevels() }])); }
 }

@@ -1,6 +1,6 @@
 import { DuelApi, polyEvents, polyBooks } from './api.js';
 import { parsePolyEvent, parseDuelEvent, duelEventStub } from './markets.js';
-import { matchGames, comparePair, toPolyFrame } from './compare.js';
+import { matchGames, comparePair, valueBets, toPolyFrame } from './compare.js';
 import { PolyStream } from './live.js';
 import { calcArb } from './calc.js';
 
@@ -23,8 +23,9 @@ const DEFAULTS = {
   duelKey: '', sports: SPORTS.map(s => s.id), bankroll: 100, minProfit: 0, maxProfit: 8, maxAgeMin: 10,
   extraPolyPct: 0, horizonH: 24, maxDuelEvents: 15,
   duelSec: 120, duelHotSec: 30, hotSum: 1.02, discoveryMin: 10,
+  minEV: 3, maxSpread: 0.04, minDepthUsd: 20, kellyFraction: 0.25, valueBank: 1000,
 };
-const FIELDS = ['duelKey', 'bankroll', 'minProfit', 'maxProfit', 'maxAgeMin', 'extraPolyPct', 'horizonH', 'maxDuelEvents', 'duelSec', 'duelHotSec', 'hotSum', 'discoveryMin'];
+const FIELDS = ['duelKey', 'bankroll', 'minProfit', 'maxProfit', 'maxAgeMin', 'extraPolyPct', 'horizonH', 'maxDuelEvents', 'duelSec', 'duelHotSec', 'hotSum', 'discoveryMin', 'minEV', 'maxSpread', 'minDepthUsd', 'kellyFraction', 'valueBank'];
 const LS = 'duelpoly.settings.v2';
 const CREDITS_PER_EVENT = 8; // between bulk (5) and single (10), for estimates
 
@@ -128,7 +129,8 @@ async function discover() {
 }
 
 /* ------------------------------- Duel odds -------------------------------- */
-const isHot = t => t.best != null && t.best < S.hotSum;
+// refreshed more often: close to an arb, or a Duel price above Polymarket's fair line
+const isHot = t => (t.best != null && t.best < S.hotSum) || (t.values || []).some(v => v.value || (v.ev > 0 && !v.problems.length));
 function due(t, now) {
   if (t.skipped) return false;
   if (!t.duelAt) return true;
@@ -174,15 +176,17 @@ function booksFor(t) {
   const m = new Map();
   for (const tok of t.tokens || []) {
     const b = live.get(tok);
-    if (b) m.set(tok, b.askLevels());
+    if (b) m.set(tok, { asks: b.askLevels(), bids: b.bidLevels() });
     else if (state.restBooks.has(tok)) m.set(tok, state.restBooks.get(tok));
   }
   return m;
 }
 function recompute(t) {
-  if (!t.duel) { t.rows = []; t.best = null; return; }
-  if (t.poly.start <= Date.now()) { t.rows = []; t.best = null; t.started = true; return; }
-  t.rows = comparePair({ poly: t.poly, duel: t.duel, perm: t.perm, score: t.score }, booksFor(t), S);
+  if (!t.duel) { t.rows = []; t.values = []; t.best = null; return; }
+  if (t.poly.start <= Date.now()) { t.rows = []; t.values = []; t.best = null; t.started = true; return; }
+  const pair = { poly: t.poly, duel: t.duel, perm: t.perm, score: t.score }, books = booksFor(t);
+  t.rows = comparePair(pair, books, S);
+  t.values = valueBets(pair, books, S);
   const clean = t.rows.filter(r => !r.problems.length);
   t.best = clean.length ? Math.min(...clean.map(r => r.sum)) : null;
 }
@@ -283,8 +287,11 @@ function render() {
   const arbs = rows.filter(isArb).sort((a, b) => b.profitPct - a.profitPct);
   const now = Date.now();
   for (const r of arbs) if (!state.seen.has(r.id)) state.seen.set(r.id, now);
+  const values = [...state.tracked.values()].flatMap(t => (t.values || []).map(v => ({ ...v, t }))).filter(v => v.value).sort((a, b) => b.ev - a.ev);
+  for (const v of values) if (!state.seen.has(v.id)) state.seen.set(v.id, now);
   $('#nArbs').textContent = arbs.length;
-  if (state.live && !state.busy) setStatus(`Реал-тайм · вилок ${arbs.length}${state.duelTickAt ? ` · Duel ${new Date(state.duelTickAt).toLocaleTimeString()}` : ''}`, 'ok');
+  $('#nValues').textContent = values.length;
+  if (state.live && !state.busy) setStatus(`Реал-тайм · вилок ${arbs.length} · валуек ${values.length}${state.duelTickAt ? ` · Duel ${new Date(state.duelTickAt).toLocaleTimeString()}` : ''}`, 'ok');
   $('#nAll').textContent = rows.length;
   $('#nGames').textContent = state.tracked.size;
 
@@ -303,6 +310,21 @@ function render() {
       <td>${r.maxBank != null ? `до <b>${usd(r.maxBank)}</b><div class="sub">${r.maxShares.toFixed(0)} акций в стакане</div>${r.bankTooBig ? '<span class="tag warn">банк больше стакана</span>' : ''}` : '—'}
           <div><button class="small calc-open" data-id="${esc(r.id)}">Калькулятор</button></div></td>
     </tr>`).join('') : `<tr><td colspan="6" class="empty">${rows.length ? 'Вилок нет. Ближайшие к вилке — во вкладке «Все сравнения».' : 'Нажмите «Сканировать» или включите реал-тайм.'}</td></tr>`;
+
+  $('#valueBody').innerHTML = values.length ? values.map(v => {
+    const d = v.duelLeg, f = v.fair, top = f.quote[v.i];
+    const mv = d.move ? `<span class="${d.move < 0 ? 'neg' : 'pos'}">${d.move > 0 ? '▲' : '▼'} с ${d.open}</span>` : '<span class="sub">не двигалась</span>';
+    return `<tr class="${now - state.seen.get(v.id) < 15000 ? 'fresh' : ''}">
+      <td><div class="profit">+${v.evPct.toFixed(1)}%</div><div class="sub">EV на дистанции</div></td>
+      <td>${gameCell(v)}${openBtns(v)}</td>
+      <td>${esc(v.label)}</td>
+      <td><span class="tag duel">Duel</span><span class="side-name">${esc(d.label)}</span><br>кэф <b>${d.price}</b> · линия ${mv}
+          <div class="sub">кэф получен ${ago(v.t.duelAt)} назад</div></td>
+      <td>${(v.p * 100).toFixed(1)}% → кэф <b>${v.fairOdds.toFixed(2)}</b>
+          <div class="sub">Polymarket ${esc(v.side)}: ${top.bid.toFixed(3)} / ${top.ask.toFixed(3)}, спред ${f.spread.toFixed(3)}</div></td>
+      <td>${copy(v.stake.toFixed(2), `<b>${usd(v.stake)}</b>`)}<div class="sub">${(S.kellyFraction * 100).toFixed(0)}% Келли от ${usd(S.valueBank)}</div></td>
+    </tr>`;
+  }).join('') : `<tr><td colspan="6" class="empty">${rows.length ? `Валуек от ${S.minEV}% нет.` : 'Нажмите «Сканировать» или включите реал-тайм.'}</td></tr>`;
 
   const all = [...rows].sort((a, b) => a.sum - b.sum);
   $('#allBody').innerHTML = all.length ? all.map(r => `<tr class="${r.problems.length ? 'off' : ''}">
