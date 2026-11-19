@@ -10,6 +10,7 @@
 </head>
 <body>
   <header class="top">
+    <button id="sideBtn" class="icon-btn" aria-label="Настройки" title="Настройки">⚙</button>
     <div class="brand">Вилки <b>Duel ↔ Polymarket</b> <span class="muted">киберспорт · прематч</span></div>
     <div class="top-actions">
       <span id="status" class="status">Готов</span>
@@ -20,6 +21,7 @@
     </div>
   </header>
 
+  <div id="shade" class="shade" hidden></div>
   <div class="layout">
     <aside class="side">
       <section>
@@ -47,6 +49,15 @@
         <label>«Duel отстаёт» от, п.п. <input id="lagPP" type="number" min="0.5" step="0.5" title="Насколько должна сдвинуться справедливая вероятность Polymarket, пока Duel не меняет кэф"></label>
         <label>Банк для валуек, $ <input id="valueBank" type="number" min="10" step="50"></label>
         <label>Доля Келли <input id="kellyFraction" type="number" min="0.05" max="1" step="0.05" title="0.25 — четверть Келли: безопаснее при ошибках в оценке"></label>
+      </section>
+      <section>
+        <h3>Telegram</h3>
+        <label>Токен бота <input id="tgToken" type="password" autocomplete="off" placeholder="от @BotFather"></label>
+        <label>Chat id <input id="tgChat" autocomplete="off" placeholder="123456789"></label>
+        <div class="row"><button type="button" id="tgFind" class="small">Найти chat id</button> <button type="button" id="tgTest" class="small">Проверить</button></div>
+        <label class="check"><input id="tgArbs" type="checkbox"> Вилки от, % <input id="tgMinProfit" type="number" step="0.1" min="0"></label>
+        <label class="check"><input id="tgValues" type="checkbox"> Валуйки от EV, % <input id="tgMinEV" type="number" step="0.5" min="0"></label>
+        <p class="note">Бот: @BotFather → /newbot → токен. Напишите своему боту, нажмите «Найти chat id», потом «Проверить». Уведомления приходят, пока сканер открыт (лучше — реал-тайм на ПК). Об одной вилке повторно — только если профит вырос на 1 п.п. или прошёл час.</p>
       </section>
       <section>
         <h3>Расход кредитов</h3>

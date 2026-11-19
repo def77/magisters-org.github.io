@@ -88,3 +88,69 @@ select.j-res { background: var(--bg); color: var(--text); border: 1px solid var(
 .calc-in input, .calc-in select { width: 150px; background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 5px; padding: 4px 6px; font: inherit; }
 .calc-grid { display: grid; grid-template-columns: 1fr 1.4fr; gap: 5px 10px; margin: 10px 0; font-size: 13px; padding-top: 10px; border-top: 1px solid var(--line); }
 .calc-grid > div:nth-child(odd) { color: var(--muted); }
+
+/* ---------- buttons shown only on phones ---------- */
+.icon-btn { display: none; font-size: 18px; padding: 4px 10px; }
+.shade { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 19; }
+.shade[hidden] { display: none; }
+.side .row { display: flex; gap: 6px; margin: 4px 0 8px; }
+.side label.check { justify-content: flex-start; gap: 6px; }
+.side label.check input[type=checkbox] { width: auto; }
+.side label.check input[type=number] { width: 64px; margin-left: auto; }
+
+/* ---------- phone ---------- */
+@media (max-width: 760px) {
+  body { font-size: 14px; }
+  .top { position: static; flex-wrap: wrap; gap: 8px; padding: 8px 12px; }
+  .icon-btn { display: inline-block; }
+  .brand { font-size: 15px; flex: 1; } .brand .muted { display: none; }
+  .top-actions { width: 100%; flex-wrap: wrap; white-space: normal; gap: 8px; }
+  .top-actions button { flex: 1; padding: 10px 8px; }
+  #status, #credits { flex-basis: 100%; font-size: 12px; }
+  .layout { display: block; }
+  .side { position: fixed; top: 0; bottom: 0; left: 0; width: 88vw; max-width: 360px; overflow-y: auto; z-index: 20;
+          transform: translateX(-102%); transition: transform .2s ease; box-shadow: 4px 0 20px rgba(0,0,0,.5); }
+  .side.open { transform: none; }
+  .side input, .side select { width: 130px; font-size: 16px; } /* 16px: no zoom on iOS */
+  .side input[type=checkbox] { width: auto; }
+  .checks label { gap: 8px; }
+  main { padding: 0 10px 30px; }
+  .tabs { position: sticky; top: 0; margin: 0 -10px 8px; padding: 6px 10px 0; overflow-x: auto; white-space: nowrap; }
+  .tab { padding: 8px 10px; }
+  /* tables become cards */
+  table.grid thead { display: none; }
+  table.grid, .grid tbody, .grid tr, .grid td { display: block; width: 100%; }
+  .grid tr { border: 1px solid var(--line); border-radius: 10px; margin: 0 0 10px; padding: 8px 10px; background: var(--panel); }
+  .grid tr:hover td { background: none; }
+  .grid td { border: none; padding: 4px 0; }
+  .grid td:empty { display: none; }
+  .grid td.empty { border: none; }
+  .grid td[data-k]::before, #arbBody td::before, #valueBody td::before, #allBody td::before, #journalBody td::before,
+  #pairBody td::before, #doubtBody td::before { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  #arbBody td:nth-child(3)::before { content: 'Рынок'; }
+  #arbBody td:nth-child(4)::before { content: 'Polymarket — купить'; }
+  #arbBody td:nth-child(5)::before { content: 'Duel — поставить'; }
+  #arbBody td:nth-child(6)::before { content: 'Лимит'; }
+  #valueBody td:nth-child(3)::before { content: 'Рынок'; }
+  #valueBody td:nth-child(4)::before { content: 'Duel — поставить'; }
+  #valueBody td:nth-child(5)::before { content: 'Справедливо по Polymarket'; }
+  #valueBody td:nth-child(6)::before { content: 'Сумма'; }
+  #allBody td:nth-child(1)::before { content: 'Сумма вероятностей'; }
+  #allBody td:nth-child(4)::before { content: 'Polymarket'; }
+  #allBody td:nth-child(5)::before { content: 'Duel'; }
+  #journalBody td:nth-child(4)::before { content: 'Ставки'; }
+  #journalBody td:nth-child(5)::before { content: 'Результат'; }
+  #journalBody td:nth-child(6)::before { content: 'Прибыль'; }
+  #doubtBody td:nth-child(3)::before { content: 'Похоже на Duel'; }
+  #pairBody td:nth-child(3)::before { content: 'Duel'; }
+  #pairBody td:nth-child(4)::before { content: 'Общих рынков'; }
+  .grid td.empty::before { content: none !important; }
+  .profit { font-size: 20px; }
+  .go a { padding: 8px 14px; font-size: 13px; }
+  button.small { padding: 7px 12px; font-size: 13px; }
+  .copy { padding: 2px 0; }
+  .jhead { flex-direction: column; }
+  .jsummary { flex-wrap: wrap; width: 100%; } .jcard { flex: 1; min-width: 140px; }
+  .calc { left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 80vh; }
+  .calc-in input, .calc-in select { width: 52%; font-size: 16px; }
+}

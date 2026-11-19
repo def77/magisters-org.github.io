@@ -5,6 +5,7 @@ import { matchGames, comparePair, valueBets, toPolyFrame } from './compare.js';
 import { PolyStream } from './live.js';
 import { calcArb } from './calc.js';
 import { LineLog } from './movement.js';
+import { loadAlerted, saveAlerted, shouldAlert, markAlerted, arbMessage, valueMessage, linkButtons, sendTelegram, findChatId } from './telegram.js';
 
 // Polymarket series id  <->  Duel sport (found by title in /v4/sports)
 const SPORTS = [
@@ -46,8 +47,10 @@ const DEFAULTS = {
   extraPolyPct: 0, horizonH: 24, maxDuelEvents: 15,
   duelSec: 180, duelHotSec: 30, hotSum: 1.01, discoveryMin: 10,
   minEV: 3, maxSpread: 0.04, minDepthUsd: 20, kellyFraction: 0.25, valueBank: 1000, lagPP: 3,
+  tgToken: '', tgChat: '', tgArbs: true, tgValues: false, tgMinProfit: 0.5, tgMinEV: 5,
 };
-const FIELDS = ['duelKey', 'bankroll', 'minProfit', 'maxProfit', 'maxAgeMin', 'extraPolyPct', 'horizonH', 'maxDuelEvents', 'duelSec', 'duelHotSec', 'hotSum', 'discoveryMin', 'minEV', 'maxSpread', 'minDepthUsd', 'kellyFraction', 'valueBank', 'lagPP'];
+const FIELDS = ['duelKey', 'bankroll', 'minProfit', 'maxProfit', 'maxAgeMin', 'extraPolyPct', 'horizonH', 'maxDuelEvents', 'duelSec', 'duelHotSec', 'hotSum', 'discoveryMin', 'minEV', 'maxSpread', 'minDepthUsd', 'kellyFraction', 'valueBank', 'lagPP',
+  'tgToken', 'tgChat', 'tgArbs', 'tgValues', 'tgMinProfit', 'tgMinEV'];
 const LS = 'duelpoly.settings.v2';
 const CREDITS_PER_EVENT = 10; // refreshes usually ask for one or two events at a time: 10 each
 
@@ -76,7 +79,7 @@ if (window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k))).c
 
 /* ---------------------------------- form ---------------------------------- */
 function fillForm() {
-  for (const f of FIELDS) $('#' + f).value = S[f];
+  for (const f of FIELDS) { const el = $('#' + f); if (el.type === 'checkbox') el.checked = !!S[f]; else el.value = S[f]; }
   const box = sp => `<label><input type="checkbox" value="${sp.id}" ${S.sports.includes(sp.id) ? 'checked' : ''}> ${sp.label}</label>`;
   $('#sports').innerHTML = `<div class="group">Киберспорт</div>${SPORTS.filter(s => s.profile === 'esports').map(box).join('')}
     <div class="group">Спорт</div>${SPORTS.filter(s => s.profile !== 'esports').map(box).join('')}`;
@@ -85,7 +88,7 @@ function fillForm() {
 function readForm() {
   for (const f of FIELDS) {
     const el = $('#' + f);
-    S[f] = el.type === 'number' ? (el.value === '' ? DEFAULTS[f] : +el.value) : el.value.trim();
+    S[f] = el.type === 'checkbox' ? el.checked : el.type === 'number' ? (el.value === '' ? DEFAULTS[f] : +el.value) : el.value.trim();
   }
   S.sports = $$('#sports input:checked').map(i => i.value);
   save(); costNote();
@@ -400,6 +403,7 @@ function render() {
       <td>${when(g.start)}</td><td><a href="${esc(g.url)}" target="polymarket" rel="noopener">${esc(g.title)}</a></td></tr>`).join('') : '<tr><td colspan="2" class="empty">—</td></tr>';
   renderCalc();
   renderCredits();
+  notify(arbs, values);
   if (state.journalDirty) { state.journalDirty = false; saveJournal(state.journal); }
   renderJournal();
 }
@@ -437,6 +441,39 @@ function renderCalc() {
       <div>Если выиграет Duel</div><div class="${res.winDuel >= 0 ? 'pos' : 'neg'}">${res.winDuel >= 0 ? '+' : ''}${usd(res.winDuel)}</div>
       <div>Гарантированно</div><div class="${res.worst >= 0 ? 'pos' : 'neg'}"><b>${res.worst >= 0 ? '+' : ''}${usd(res.worst)} (${res.worstPct.toFixed(2)}%)</b></div>
     </div>` : '<p class="sub">Проверьте цену (0–1) и кэф (> 1).</p>';
+}
+
+/* -------------------------------- Telegram -------------------------------- */
+const alerted = loadAlerted();
+const tgQueue = [];
+let tgBusy = false;
+/** Send new arbs / value bets (from render) — each once, again only when it got better or an hour passed. */
+function notify(arbs, values) {
+  if (!S.tgToken || !S.tgChat) return;
+  const now = Date.now();
+  if (S.tgArbs) for (const r of arbs) {
+    if (r.profitPct < S.tgMinProfit || !shouldAlert(alerted, r.id, r.profitPct, now)) continue;
+    markAlerted(alerted, r.id, r.profitPct, now);
+    tgQueue.push([arbMessage({ ...r, risk: r.t?.sp?.risk }, { bankroll: S.bankroll, sportLabel: r.t?.sp?.label }), linkButtons(r.poly.url, r.duel.url)]);
+  }
+  if (S.tgValues) for (const v of values) {
+    if (v.evPct < S.tgMinEV || !shouldAlert(alerted, v.id, v.evPct, now, { stepPct: 2 })) continue;
+    markAlerted(alerted, v.id, v.evPct, now);
+    tgQueue.push([valueMessage({ ...v, risk: v.t?.sp?.risk }, { valueBank: S.valueBank, kellyFraction: S.kellyFraction, sportLabel: v.t?.sp?.label }), linkButtons(v.poly.url, v.duel.url)]);
+  }
+  if (tgQueue.length) { saveAlerted(alerted, now); drainTelegram(); }
+}
+async function drainTelegram() {
+  if (tgBusy) return;
+  tgBusy = true;
+  try {
+    while (tgQueue.length) {
+      const [text, buttons] = tgQueue.shift();
+      try { await sendTelegram(S.tgToken, S.tgChat, text, buttons); }
+      catch (e) { log(e.message, 'error'); if (/unauthorized|not found|chat not found/i.test(e.message)) { tgQueue.length = 0; break; } }
+      await new Promise(r => setTimeout(r, 1100)); // stay far below Telegram's limits
+    }
+  } finally { tgBusy = false; }
 }
 
 /* --------------------------------- journal -------------------------------- */
@@ -533,6 +570,27 @@ $('#jCsv').addEventListener('click', () => {
   a.download = `journal-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
 });
 $('#scanBtn').addEventListener('click', fullScan);
+$('#tgTest').addEventListener('click', async () => {
+  readForm();
+  if (!S.tgToken || !S.tgChat) return log('Telegram: вставьте токен бота и chat id', 'warn');
+  try {
+    const ok = await sendTelegram(S.tgToken, S.tgChat, '✅ Сканер Duel ↔ Polymarket подключён. Сюда будут приходить новые вилки.');
+    log(ok ? 'Telegram: тестовое сообщение отправлено' : 'Telegram: отправлено (ответ браузер не показывает — проверьте чат)', 'ok');
+  } catch (e) { log(e.message, 'error'); }
+});
+$('#tgFind').addEventListener('click', async () => {
+  readForm();
+  if (!S.tgToken) return log('Telegram: сначала вставьте токен бота', 'warn');
+  try {
+    const id = await findChatId(S.tgToken);
+    if (!id) return log('Telegram: напишите боту любое сообщение и нажмите ещё раз', 'warn');
+    $('#tgChat').value = id; readForm(); log(`Telegram: chat id ${id} сохранён`, 'ok');
+  } catch (e) { log(e.message + ' — впишите chat id вручную (например, через @userinfobot)', 'error'); }
+});
+// phone: settings slide in from the left
+const toggleSide = open => { $('.side').classList.toggle('open', open); $('#shade').hidden = !open; };
+$('#sideBtn').addEventListener('click', () => toggleSide(!$('.side').classList.contains('open')));
+$('#shade').addEventListener('click', () => toggleSide(false));
 $('#liveBtn').addEventListener('click', () => (state.live ? stopLive() : startLive()));
 $('#calcClose').addEventListener('click', () => { $('#calc').hidden = true; state.calcId = null; });
 ['#cPrice', '#cOdds'].forEach(s => $(s).addEventListener('input', () => { state.calcEdited = true; renderCalc(); }));
