@@ -1,152 +1,176 @@
 <!doctype html>
-<html lang="ru">
+<html lang="ru" data-theme="light">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Вилки Duel ↔ Polymarket</title>
-  <meta name="description" content="Сканер вилок между Duel.com и Polymarket: киберспорт">
+  <meta name="description" content="Сканер вилок и валуек между Duel.com и Polymarket: киберспорт и спорт">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <script>try { const t = localStorage.getItem('duelpoly.theme'); if (t) document.documentElement.dataset.theme = t; } catch {}</script>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
   <header class="top">
-    <button id="sideBtn" class="icon-btn" aria-label="Настройки" title="Настройки">⚙</button>
-    <div class="brand">Вилки <b>Duel ↔ Polymarket</b> <span class="muted">киберспорт · прематч</span></div>
-    <div class="top-actions">
-      <span id="status" class="status">Готов</span>
+    <div class="brand"><img src="icons/icon.svg" alt=""><span>Duel<b>Poly</b></span></div>
+    <nav class="tabs">
+      <button class="tab active" data-tab="arbs">Вилки <span id="nArbs" class="badge">0</span></button>
+      <button class="tab" data-tab="values">Валуйки <span id="nValues" class="badge">0</span></button>
+      <button class="tab" data-tab="all">Сравнения <span id="nAll" class="badge">0</span></button>
+      <button class="tab" data-tab="games">Матчи <span id="nGames" class="badge">0</span></button>
+      <button class="tab" data-tab="journal">Журнал <span id="nJournal" class="badge">0</span></button>
+      <button class="tab" data-tab="log">Лог</button>
+    </nav>
+    <div class="top-right">
       <span id="wsState" class="pill" hidden>Polymarket: подключение…</span>
-      <span id="credits" class="muted" title="Кредиты DuelAPI"></span>
-      <button id="scanBtn">Сканировать</button>
-      <button id="liveBtn" class="primary" title="Polymarket — мгновенно по WebSocket, Duel — по расписанию из настроек">Реал-тайм: выкл</button>
+      <span class="sys"><span class="dot"></span><span id="status" class="status">Готов</span></span>
+      <button id="themeBtn" class="icon" title="Светлая / тёмная тема" aria-label="Тема"></button>
+      <button id="sideBtn" class="ghost" title="Настройки">⚙ <span class="lbl">Панель</span></button>
     </div>
   </header>
 
   <div id="shade" class="shade" hidden></div>
-  <div class="layout">
-    <aside class="side">
-      <section>
-        <h3>DuelAPI</h3>
-        <label>Ключ <input id="duelKey" type="password" autocomplete="off" placeholder="api.duelapi.com → Get API key"></label>
-        <p class="note">Ключ хранится только в этом браузере.</p>
-      </section>
-      <section>
-        <h3>Дисциплины</h3>
-        <div id="sports" class="checks"></div>
-      </section>
-      <section>
-        <h3>Расчёт</h3>
-        <label>Банк на вилку, $ <input id="bankroll" type="number" min="1" step="10"></label>
-        <label>Вилки от, % <input id="minProfit" type="number" step="0.1"></label>
-        <label>«Подозрительно» выше, % <input id="maxProfit" type="number" step="0.5" title="Такую вилку проверьте руками: часто это ошибка линии"></label>
-        <label>Кэф Duel не старше, мин <input id="maxAgeMin" type="number" min="0" step="1" title="0 — не проверять"></label>
-        <label>Доп. комиссия Polymarket, % <input id="extraPolyPct" type="number" min="0" step="0.1" title="Поверх комиссии рынка (она учитывается сама)"></label>
-      </section>
-      <section>
-        <h3>Валуйки</h3>
-        <label>EV от, % <input id="minEV" type="number" min="0" step="0.5"></label>
-        <label>Спред Polymarket до <input id="maxSpread" type="number" min="0.005" step="0.005" title="Шире — цена Polymarket ненадёжна как справедливая"></label>
-        <label>Объём у лучших цен от, $ <input id="minDepthUsd" type="number" min="0" step="10" title="Тонкий стакан легко сдвинуть — такая цена не справедливая"></label>
-        <label>«Duel отстаёт» от, п.п. <input id="lagPP" type="number" min="0.5" step="0.5" title="Насколько должна сдвинуться справедливая вероятность Polymarket, пока Duel не меняет кэф"></label>
-        <label>Банк для валуек, $ <input id="valueBank" type="number" min="10" step="50"></label>
-        <label>Доля Келли <input id="kellyFraction" type="number" min="0.05" max="1" step="0.05" title="0.25 — четверть Келли: безопаснее при ошибках в оценке"></label>
-      </section>
-      <section>
-        <h3>Telegram</h3>
-        <label>Токен бота <input id="tgToken" type="password" autocomplete="off" placeholder="от @BotFather"></label>
-        <label>Chat id <input id="tgChat" autocomplete="off" placeholder="123456789"></label>
-        <div class="row"><button type="button" id="tgFind" class="small">Найти chat id</button> <button type="button" id="tgTest" class="small">Проверить</button></div>
-        <label class="check"><input id="tgArbs" type="checkbox"> Вилки от, % <input id="tgMinProfit" type="number" step="0.1" min="0"></label>
-        <label class="check"><input id="tgValues" type="checkbox"> Валуйки от EV, % <input id="tgMinEV" type="number" step="0.5" min="0"></label>
-        <p class="note">Бот: @BotFather → /newbot → токен. Напишите своему боту, нажмите «Найти chat id», потом «Проверить». Уведомления приходят, пока сканер открыт (лучше — реал-тайм на ПК). Об одной вилке повторно — только если профит вырос на 1 п.п. или прошёл час.</p>
-      </section>
-      <section>
-        <h3>Расход кредитов</h3>
-        <label>Матчи в ближайшие, ч <input id="horizonH" type="number" min="1" step="1"></label>
-        <label>Не больше матчей Duel за скан <input id="maxDuelEvents" type="number" min="1" step="1" title="Каждый матч — 5–10 кредитов"></label>
-      </section>
-      <section>
-        <h3>Реал-тайм</h3>
-        <label>Duel обновлять раз в, с <input id="duelSec" type="number" min="10" step="10" title="Обычные пары"></label>
-        <label>Близкие к вилке — раз в, с <input id="duelHotSec" type="number" min="5" step="5"></label>
-        <label>«Близко» — сумма ниже <input id="hotSum" type="number" min="1" step="0.005"></label>
-        <label>Искать новые матчи раз в, мин <input id="discoveryMin" type="number" min="2" step="1"></label>
-        <p class="note" id="costNote"></p>
-      </section>
-    </aside>
+  <aside class="side">
+    <div class="side-head"><b>Настройки</b><button id="sideClose" class="icon" aria-label="Закрыть">✕</button></div>
+    <section>
+      <h3>DuelAPI</h3>
+      <label>Ключ <input id="duelKey" type="password" autocomplete="off" placeholder="api.duelapi.com → Get API key"></label>
+      <p class="note">Ключ хранится только в этом браузере.</p>
+    </section>
+    <section>
+      <h3>Дисциплины</h3>
+      <div id="sports" class="checks"></div>
+    </section>
+    <section>
+      <h3>Расчёт</h3>
+      <label>Банк на вилку, $ <input id="bankroll" type="number" min="1" step="10"></label>
+      <label>Вилки от, % <input id="minProfit" type="number" step="0.1"></label>
+      <label>«Подозрительно» выше, % <input id="maxProfit" type="number" step="0.5" title="Такую вилку проверьте руками: часто это ошибка линии"></label>
+      <label>Кэф Duel не старше, мин <input id="maxAgeMin" type="number" min="0" step="1" title="0 — не проверять"></label>
+      <label>Доп. комиссия Polymarket, % <input id="extraPolyPct" type="number" min="0" step="0.1" title="Поверх комиссии рынка (она учитывается сама)"></label>
+    </section>
+    <section>
+      <h3>Валуйки</h3>
+      <label>EV от, % <input id="minEV" type="number" min="0" step="0.5"></label>
+      <label>Спред Polymarket до <input id="maxSpread" type="number" min="0.005" step="0.005" title="Шире — цена Polymarket ненадёжна как справедливая"></label>
+      <label>Объём у лучших цен от, $ <input id="minDepthUsd" type="number" min="0" step="10" title="Тонкий стакан легко сдвинуть — такая цена не справедливая"></label>
+      <label>«Duel отстаёт» от, п.п. <input id="lagPP" type="number" min="0.5" step="0.5" title="Насколько должна сдвинуться справедливая вероятность Polymarket, пока Duel не меняет кэф"></label>
+      <label>Банк для валуек, $ <input id="valueBank" type="number" min="10" step="50"></label>
+      <label>Доля Келли <input id="kellyFraction" type="number" min="0.05" max="1" step="0.05" title="0.25 — четверть Келли: безопаснее при ошибках в оценке"></label>
+    </section>
+    <section>
+      <h3>Telegram</h3>
+      <label>Токен бота <input id="tgToken" type="password" autocomplete="off" placeholder="от @BotFather"></label>
+      <label>Chat id <input id="tgChat" autocomplete="off" placeholder="123456789"></label>
+      <div class="row"><button type="button" id="tgFind" class="small">Найти chat id</button> <button type="button" id="tgTest" class="small">Проверить</button></div>
+      <label class="check"><input id="tgArbs" type="checkbox"> Вилки от, % <input id="tgMinProfit" type="number" step="0.1" min="0"></label>
+      <label class="check"><input id="tgValues" type="checkbox"> Валуйки от EV, % <input id="tgMinEV" type="number" step="0.5" min="0"></label>
+      <p class="note">Бот: @BotFather → /newbot → токен. Напишите своему боту, нажмите «Найти chat id», потом «Проверить». Уведомления приходят, пока сканер открыт (лучше — реал-тайм на ПК). Об одной вилке повторно — только если профит вырос на 1 п.п. или прошёл час.</p>
+    </section>
+    <section>
+      <h3>Расход кредитов</h3>
+      <label>Матчи в ближайшие, ч <input id="horizonH" type="number" min="1" step="1"></label>
+      <label>Не больше матчей Duel за скан <input id="maxDuelEvents" type="number" min="1" step="1" title="Каждый матч — 5–10 кредитов"></label>
+    </section>
+    <section>
+      <h3>Реал-тайм</h3>
+      <label>Duel обновлять раз в, с <input id="duelSec" type="number" min="10" step="10" title="Обычные пары"></label>
+      <label>Близкие к вилке — раз в, с <input id="duelHotSec" type="number" min="5" step="5"></label>
+      <label>«Близко» — сумма ниже <input id="hotSum" type="number" min="1" step="0.005"></label>
+      <label>Искать новые матчи раз в, мин <input id="discoveryMin" type="number" min="2" step="1"></label>
+      <p class="note" id="costNote"></p>
+    </section>
+  </aside>
 
-    <main>
-      <nav class="tabs">
-        <button class="tab active" data-tab="arbs">Вилки <span id="nArbs" class="badge">0</span></button>
-        <button class="tab" data-tab="values">Валуйки <span id="nValues" class="badge">0</span></button>
-        <button class="tab" data-tab="all">Все сравнения <span id="nAll" class="badge">0</span></button>
-        <button class="tab" data-tab="games">Матчи <span id="nGames" class="badge">0</span></button>
-        <button class="tab" data-tab="journal">Журнал <span id="nJournal" class="badge">0</span></button>
-        <button class="tab" data-tab="log">Лог</button>
-      </nav>
-
-      <section id="tab-arbs" class="panel">
-        <p class="note">Каждая строка — две противоположные ставки на один рынок одного матча. Сначала проверьте на сайтах, что цены те же, потом ставьте: Polymarket — по стакану, Duel — по кэфу.</p>
-        <table class="grid">
-          <thead><tr><th>Профит</th><th>Матч</th><th>Рынок</th><th>Polymarket — купить</th><th>Duel — поставить</th><th>Лимит</th></tr></thead>
-          <tbody id="arbBody"></tbody>
-        </table>
-      </section>
-
-      <section id="tab-values" class="panel hidden">
-        <p class="note">Ставки на Duel дороже справедливой цены Polymarket (середина стакана, без комиссии). Это <b>не вилка</b>: выигрыш не гарантирован, плюс получается на дистанции. Сумма — доля Келли от банка из настроек. Рынки с широким спредом на Polymarket отброшены.</p>
-        <table class="grid">
-          <thead><tr><th>EV</th><th>Матч</th><th>Рынок</th><th>Duel — поставить</th><th>Справедливо по Polymarket</th><th>Сумма</th></tr></thead>
-          <tbody id="valueBody"></tbody>
-        </table>
-      </section>
-
-      <section id="tab-all" class="panel hidden">
-        <p class="note">Все пары «Polymarket + Duel» по общим рынкам, от лучшей суммы к худшей. Сумма &lt; 1 — вилка. Серым — отброшено (причина в последней колонке).</p>
-        <table class="grid">
-          <thead><tr><th>Сумма</th><th>Матч</th><th>Рынок</th><th>Polymarket</th><th>Duel</th><th>Примечание</th><th></th></tr></thead>
-          <tbody id="allBody"></tbody>
-        </table>
-      </section>
-
-      <section id="tab-games" class="panel hidden">
-        <h4>Сопоставлены</h4>
-        <table class="grid"><thead><tr><th>Начало</th><th>Polymarket</th><th>Duel</th><th>Общих рынков</th></tr></thead><tbody id="pairBody"></tbody></table>
-        <h4>Под вопросом — вилки по ним не ищутся</h4>
-        <table class="grid"><thead><tr><th>Начало</th><th>Polymarket</th><th>Похоже на Duel</th><th>Почему</th></tr></thead><tbody id="doubtBody"></tbody></table>
-        <h4>Нет на Duel</h4>
-        <table class="grid"><thead><tr><th>Начало</th><th>Polymarket</th></tr></thead><tbody id="aloneBody"></tbody></table>
-      </section>
-
-      <section id="tab-journal" class="panel hidden">
-        <div class="jhead"><div id="jSummary" class="jsummary"></div>
-          <div><button id="jSettle" class="small">Проверить результаты</button> <button id="jCsv" class="small">Скачать CSV</button></div></div>
-        <p class="note">Результат берётся из закрытия рынка Polymarket — того самого, по которому шло сравнение (бесплатно, проверка раз в 10 минут). Если Duel рассчитал иначе (например, вернул ставку при снятии теннисиста) — поправьте вручную. CLV — насколько взятый кэф Duel лучше справедливой цены Polymarket перед началом. Журнал хранится в этом браузере.</p>
-        <table class="grid">
-          <thead><tr><th>Записано</th><th>Матч</th><th>Рынок</th><th>Ставки</th><th>Результат</th><th>Прибыль</th><th></th></tr></thead>
-          <tbody id="journalBody"></tbody>
-        </table>
-      </section>
-
-      <section id="tab-log" class="panel hidden"><pre id="log"></pre></section>
-    </main>
+  <div class="toolbar">
+    <button id="liveBtn" class="pill-btn" title="Polymarket — мгновенно по WebSocket, Duel — по расписанию из настроек">Реал-тайм: выкл</button>
+    <button id="scanBtn" class="pill-btn">⟳ Обновить</button>
+    <button id="calcBtn" class="pill-btn">▦ Калькулятор</button>
+    <span class="spacer"></span>
+    <span id="credits" title="Кредиты DuelAPI"></span>
+    <div class="seg" id="sortBy"><button data-sort="profit" class="on">Профит</button><button data-sort="time">Время</button></div>
+    <button id="hiddenBtn" class="pill-btn quiet" hidden title="Показать скрытые снова"></button>
+    <input id="search" type="search" placeholder="Поиск: команда, турнир, рынок">
   </div>
 
-  <div id="calc" class="calc" hidden>
-    <div class="calc-head"><b>Калькулятор</b><button id="calcClose" class="small">✕</button></div>
-    <div id="cTitle" class="sub"></div>
-    <div id="cSides" class="calc-sides"></div>
-    <div class="calc-in">
-      <label>Цена Polymarket <input id="cPrice" type="number" step="0.001" min="0" max="1"></label>
-      <label>Кэф Duel <input id="cOdds" type="number" step="0.01" min="1"></label>
-      <label>Считать от <select id="cMode"><option value="bank">общего банка</option><option value="poly">суммы на Polymarket</option><option value="duel">ставки на Duel</option></select></label>
-      <label>Сумма, $ <input id="cAmount" type="number" min="1" step="1"></label>
-      <label>Округлить ставку Duel до <select id="cRound"><option value="0">не округлять</option><option value="1">$1</option><option value="5">$5</option><option value="10">$10</option></select></label>
-      <button id="cReset" class="small" title="Вернуть текущие цены из сканера">Текущие цены</button>
-      <button id="cJournal" class="small" title="Записать вилку с суммами из калькулятора">В журнал</button>
-    </div>
-    <div id="cOut"></div>
-    <div id="cGo"></div>
-    <p class="note">Цены подтягиваются сами, пока вы их не меняете. Клик по сумме — скопировать.</p>
+  <div class="layout">
+    <main>
+      <div class="card">
+        <div id="calc" class="calc" hidden>
+          <div class="calc-head"><b>Калькулятор</b> <span id="cTitle" class="sub"></span><button id="calcClose" class="icon" aria-label="Закрыть">✕</button></div>
+          <div id="cEmpty" class="sub">Нажмите ▦ в строке вилки — цены подставятся сами.</div>
+          <div id="cBody">
+            <div class="legs">
+              <div class="leg"><span class="chip poly">Polymarket</span><span id="cPolySide" class="side-name"></span>
+                <label>цена <input id="cPrice" type="number" step="0.001" min="0" max="1"></label>
+                <span class="leg-out" id="cPolyOut"></span></div>
+              <div class="leg"><span class="chip duel">Duel</span><span id="cDuelSide" class="side-name"></span>
+                <label>кэф <input id="cOdds" type="number" step="0.01" min="1"></label>
+                <span class="leg-out" id="cDuelOut"></span></div>
+            </div>
+            <div class="calc-foot">
+              <label>от <select id="cMode"><option value="bank">общего банка</option><option value="poly">суммы на Polymarket</option><option value="duel">ставки на Duel</option></select></label>
+              <label>$ <input id="cAmount" type="number" min="1" step="1"></label>
+              <label>округлить Duel <select id="cRound"><option value="0">нет</option><option value="1">$1</option><option value="5">$5</option><option value="10">$10</option></select></label>
+              <span id="cOut" class="calc-total"></span>
+              <span class="spacer"></span>
+              <span id="cGo"></span>
+              <button id="cReset" class="small" title="Вернуть текущие цены из сканера">Текущие цены</button>
+              <button id="cJournal" class="small accent" title="Записать вилку с суммами из калькулятора">Сохранить в журнал</button>
+            </div>
+            <div id="cSides" class="sub"></div>
+          </div>
+        </div>
+
+        <section id="tab-arbs" class="panel">
+          <table class="grid">
+            <thead><tr><th>Время</th><th>Профит</th><th>Событие</th><th>Тип ставки</th><th>Лимит</th><th>Открыть</th></tr></thead>
+            <tbody id="arbBody"></tbody>
+          </table>
+        </section>
+
+        <section id="tab-values" class="panel hidden">
+          <p class="note">Ставки на Duel дороже справедливой цены Polymarket (середина стакана, без комиссии). Это <b>не вилка</b>: плюс получается на дистанции. Сумма — доля Келли от банка из настроек.</p>
+          <table class="grid">
+            <thead><tr><th>Время</th><th>EV</th><th>Событие</th><th>Тип ставки</th><th>Сумма</th><th>Открыть</th></tr></thead>
+            <tbody id="valueBody"></tbody>
+          </table>
+        </section>
+
+        <section id="tab-all" class="panel hidden">
+          <p class="note">Все пары «Polymarket + Duel» по общим рынкам, от лучшей суммы к худшей. Сумма &lt; 1 — вилка. Серым — отброшено (причина в колонке «Примечание»).</p>
+          <table class="grid">
+            <thead><tr><th>Сумма</th><th>Событие</th><th>Тип ставки</th><th>Примечание</th><th>Открыть</th></tr></thead>
+            <tbody id="allBody"></tbody>
+          </table>
+        </section>
+
+        <section id="tab-games" class="panel hidden">
+          <h4>Сопоставлены</h4>
+          <table class="grid"><thead><tr><th>Начало</th><th>Polymarket</th><th>Duel</th><th>Общих рынков</th></tr></thead><tbody id="pairBody"></tbody></table>
+          <h4>Под вопросом — вилки по ним не ищутся</h4>
+          <table class="grid"><thead><tr><th>Начало</th><th>Polymarket</th><th>Похоже на Duel</th><th>Почему</th></tr></thead><tbody id="doubtBody"></tbody></table>
+          <h4>Нет на Duel</h4>
+          <table class="grid"><thead><tr><th>Начало</th><th>Polymarket</th></tr></thead><tbody id="aloneBody"></tbody></table>
+        </section>
+
+        <section id="tab-journal" class="panel hidden">
+          <div class="jhead"><div id="jSummary" class="jsummary"></div>
+            <div><button id="jSettle" class="small">Проверить результаты</button> <button id="jCsv" class="small">Скачать CSV</button></div></div>
+          <p class="note">Результат берётся из закрытия рынка Polymarket — того самого, по которому шло сравнение (бесплатно, проверка раз в 10 минут). Если Duel рассчитал иначе — поправьте вручную. CLV — насколько взятый кэф Duel лучше справедливой цены Polymarket перед началом. Журнал хранится в этом браузере.</p>
+          <table class="grid">
+            <thead><tr><th>Записано</th><th>Событие</th><th>Рынок</th><th>Ставки</th><th>Результат</th><th>Прибыль</th><th></th></tr></thead>
+            <tbody id="journalBody"></tbody>
+          </table>
+        </section>
+
+        <section id="tab-log" class="panel hidden"><pre id="log"></pre></section>
+      </div>
+    </main>
+
+    <aside id="coupon" class="coupon">
+      <div class="coupon-head"><b>Купон</b><button id="couponClose" class="icon" aria-label="Закрыть">✕</button></div>
+      <div id="couponBody"><p class="sub">Нажмите на строку вилки или валуйки — здесь появятся обе ставки и стакан Polymarket.</p></div>
+    </aside>
   </div>
   <script type="module" src="js/app.js"></script>
 </body>
