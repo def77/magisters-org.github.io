@@ -5,6 +5,7 @@ import { matchGames, comparePair, valueBets, toPolyFrame } from './compare.js';
 import { PolyStream } from './live.js';
 import { calcArb } from './calc.js';
 import { LineLog } from './movement.js';
+import { loadAlerted, saveAlerted, shouldAlert, markAlerted, arbMessage, valueMessage, linkButtons, sendTelegram, findChatId } from './telegram.js';
 
 // Polymarket series id  <->  Duel sport (found by title in /v4/sports)
 const SPORTS = [
@@ -46,8 +47,10 @@ const DEFAULTS = {
   extraPolyPct: 0, horizonH: 24, maxDuelEvents: 15,
   duelSec: 180, duelHotSec: 30, hotSum: 1.01, discoveryMin: 10,
   minEV: 3, maxSpread: 0.04, minDepthUsd: 20, kellyFraction: 0.25, valueBank: 1000, lagPP: 3,
+  tgToken: '', tgChat: '', tgArbs: true, tgValues: false, tgMinProfit: 0.5, tgMinEV: 5,
 };
-const FIELDS = ['duelKey', 'bankroll', 'minProfit', 'maxProfit', 'maxAgeMin', 'extraPolyPct', 'horizonH', 'maxDuelEvents', 'duelSec', 'duelHotSec', 'hotSum', 'discoveryMin', 'minEV', 'maxSpread', 'minDepthUsd', 'kellyFraction', 'valueBank', 'lagPP'];
+const FIELDS = ['duelKey', 'bankroll', 'minProfit', 'maxProfit', 'maxAgeMin', 'extraPolyPct', 'horizonH', 'maxDuelEvents', 'duelSec', 'duelHotSec', 'hotSum', 'discoveryMin', 'minEV', 'maxSpread', 'minDepthUsd', 'kellyFraction', 'valueBank', 'lagPP',
+  'tgToken', 'tgChat', 'tgArbs', 'tgValues', 'tgMinProfit', 'tgMinEV'];
 const LS = 'duelpoly.settings.v2';
 const CREDITS_PER_EVENT = 10; // refreshes usually ask for one or two events at a time: 10 each
 
@@ -76,7 +79,7 @@ if (window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k))).c
 
 /* ---------------------------------- form ---------------------------------- */
 function fillForm() {
-  for (const f of FIELDS) $('#' + f).value = S[f];
+  for (const f of FIELDS) { const el = $('#' + f); if (el.type === 'checkbox') el.checked = !!S[f]; else el.value = S[f]; }
   const box = sp => `<label><input type="checkbox" value="${sp.id}" ${S.sports.includes(sp.id) ? 'checked' : ''}> ${sp.label}</label>`;
   $('#sports').innerHTML = `<div class="group">Киберспорт</div>${SPORTS.filter(s => s.profile === 'esports').map(box).join('')}
     <div class="group">Спорт</div>${SPORTS.filter(s => s.profile !== 'esports').map(box).join('')}`;
@@ -85,7 +88,7 @@ function fillForm() {
 function readForm() {
   for (const f of FIELDS) {
     const el = $('#' + f);
-    S[f] = el.type === 'number' ? (el.value === '' ? DEFAULTS[f] : +el.value) : el.value.trim();
+    S[f] = el.type === 'checkbox' ? el.checked : el.type === 'number' ? (el.value === '' ? DEFAULTS[f] : +el.value) : el.value.trim();
   }
   S.sports = $$('#sports input:checked').map(i => i.value);
   save(); costNote();
@@ -238,7 +241,7 @@ function recompute(t) {
 function needKey() {
   readForm();
   if (S.duelKey) { api = api && api.key === S.duelKey ? api : new DuelApi(S.duelKey, { log }); return true; }
-  setStatus('Нужен ключ DuelAPI', 'error'); log('Вставьте ключ DuelAPI слева', 'warn'); return false;
+  setStatus('Нужен ключ DuelAPI', 'error'); log('Вставьте ключ DuelAPI: кнопка «Панель» справа вверху', 'warn'); toggleSide(true); return false;
 }
 
 /** One full pass: find games, load Duel odds, load order books. */
@@ -307,11 +310,20 @@ function stopLive() {
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const usd = x => '$' + (Math.abs(x) >= 100 ? x.toFixed(0) : x.toFixed(2));
 const when = d => d.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
-const ago = ms => { const s = Math.round((Date.now() - ms) / 1000); return s < 60 ? `${s} с` : `${Math.round(s / 60)} мин`; };
+const hm = ms => new Date(ms).toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+const ago = ms => { const s = Math.round((Date.now() - ms) / 1000); return s < 60 ? `${s} с` : s < 5400 ? `${Math.round(s / 60)} мин` : `${Math.round(s / 3600)} ч`; };
+const signedUsd = x => (x >= 0 ? '+' : '−') + usd(Math.abs(x));
 const allRows = () => [...state.tracked.values()].flatMap(t => t.rows.map(r => ({ ...r, t })));
+const allValues = () => [...state.tracked.values()].flatMap(t => (t.values || []).map(v => ({ ...v, t })));
 const isArb = r => r.arb && r.profitPct >= S.minProfit;
-const gameCell = r => `<div>${esc(r.poly.title)}</div><div class="sub">${when(r.poly.start)} · ${esc(r.poly.tournament || r.duel.tournament)}</div>${r.t?.sp?.risk ? `<span class="tag warn" title="${esc(r.t.sp.risk)}">риск: снятие игрока</span>` : ''}`;
+const tournament = r => r.poly.tournament || r.duel?.tournament || '';
+const gameCell = r => `<div class="ev-title">${esc(r.poly.title)}</div>
+  <div class="sub">${esc([r.t?.sp?.label, tournament(r)].filter(Boolean).join(' · '))} · ${when(r.poly.start)}</div>${r.t?.sp?.risk ? `<span class="tag warn" title="${esc(r.t.sp.risk)}">риск: снятие игрока</span>` : ''}`;
 const openBtns = r => `<div class="go"><a class="btn-pm" href="${esc(r.poly.url)}" target="polymarket" rel="noopener">Polymarket ↗</a><a class="btn-duel" href="${esc(r.duel.url)}" target="duel" rel="noopener">Duel ↗</a></div>`;
+/** Compact action buttons of a table row: open both sites, then row-specific ones. */
+const acts = (r, extra = '') => `<div class="acts"><a class="pm" href="${esc(r.poly.url)}" target="polymarket" rel="noopener" title="Открыть на Polymarket">P</a><a class="du" href="${esc(r.duel.url)}" target="duel" rel="noopener" title="Открыть на Duel">D</a>${extra}</div>`;
+const hideBtn = id => `<button class="hide-row" data-id="${esc(id)}" title="Скрыть">✕</button>`;
+const timeCell = id => { const s = state.seen.get(id); return s ? `<div class="time">${hm(s)}</div><div class="sub">${ago(s)}</div>` : ''; };
 /** Duel line movement seen this session, and whether Duel lags behind Polymarket. */
 const moveNote = m => {
   if (!m) return '';
@@ -321,6 +333,14 @@ const moveNote = m => {
   return parts.length ? `<div class="sub">${parts.join(' · ')}</div>` : '';
 };
 const copy = (val, text) => `<span class="copy" data-copy="${val}" title="Скопировать">${text}</span>`;
+
+// toolbar state: sort, search, hidden rows (remembered in this browser)
+const HIDDEN_LS = 'duelpoly.hidden.v1';
+state.hidden = (() => { try { return new Set(JSON.parse(localStorage.getItem(HIDDEN_LS) || '[]')); } catch { return new Set(); } })();
+const saveHidden = () => { try { localStorage.setItem(HIDDEN_LS, JSON.stringify([...state.hidden].slice(-500))); } catch {} };
+state.sort = 'profit'; state.q = ''; state.selId = null;
+const matchQ = r => !state.q || `${r.poly.title} ${tournament(r)} ${r.label} ${r.t?.sp?.label || ''} ${r.duel?.title || ''}`.toLowerCase().includes(state.q);
+const byTime = (a, b) => (state.seen.get(b.id) || 0) - (state.seen.get(a.id) || 0);
 
 function renderCredits() {
   const hours = state.live ? (Date.now() - state.liveSince) / 3600e3 : 0;
@@ -333,75 +353,170 @@ function renderCredits() {
   costNote();
 }
 
+const emptyRow = (cols, text) => `<tr><td colspan="${cols}" class="empty">${text}</td></tr>`;
+const rowCls = (id, now, extra = '') => `pick ${extra} ${now - state.seen.get(id) < 15000 ? 'fresh' : ''} ${state.selId === id ? 'sel' : ''}`;
+
 function render() {
   const rows = allRows();
-  const arbs = rows.filter(isArb).sort((a, b) => b.profitPct - a.profitPct);
   const now = Date.now();
-  for (const r of arbs) if (!state.seen.has(r.id)) state.seen.set(r.id, now);
-  const values = [...state.tracked.values()].flatMap(t => (t.values || []).map(v => ({ ...v, t }))).filter(v => v.value).sort((a, b) => b.ev - a.ev);
-  for (const v of values) if (!state.seen.has(v.id)) state.seen.set(v.id, now);
+  const arbsAll = rows.filter(isArb);
+  for (const r of arbsAll) if (!state.seen.has(r.id)) state.seen.set(r.id, now);
+  const valuesAll = allValues().filter(v => v.value);
+  for (const v of valuesAll) if (!state.seen.has(v.id)) state.seen.set(v.id, now);
+  const arbs = arbsAll.filter(r => !state.hidden.has(r.id) && matchQ(r)).sort(state.sort === 'time' ? byTime : (a, b) => b.profitPct - a.profitPct);
+  const values = valuesAll.filter(v => !state.hidden.has(v.id) && matchQ(v)).sort(state.sort === 'time' ? byTime : (a, b) => b.ev - a.ev);
+  const nHidden = [...arbsAll, ...valuesAll].filter(r => state.hidden.has(r.id)).length;
+  $('#hiddenBtn').hidden = !nHidden; $('#hiddenBtn').textContent = `Скрыто: ${nHidden} · показать`;
   $('#nArbs').textContent = arbs.length;
   $('#nValues').textContent = values.length;
   if (state.live && !state.busy) setStatus(`Вилок ${arbs.length} · валуек ${values.length}${state.duelTickAt ? ` · Duel ${new Date(state.duelTickAt).toLocaleTimeString('ru-RU')}` : ''}`, 'ok');
   $('#nAll').textContent = rows.length;
   $('#nGames').textContent = state.tracked.size;
+  const nothing = 'Нажмите «Обновить» или включите реал-тайм.';
 
-  $('#arbBody').innerHTML = arbs.length ? arbs.map(r => `<tr class="${now - state.seen.get(r.id) < 15000 ? 'fresh' : ''}">
-      <td><div class="profit ${r.suspicious ? 'sus' : ''}">+${r.profitPct.toFixed(2)}%</div><div class="sub">+${usd(r.profitUsd)} с ${usd(S.bankroll)}</div>${r.suspicious ? '<span class="tag warn">проверь руками</span>' : ''}</td>
-      <td>${gameCell(r)}${openBtns(r)}</td>
-      <td>${esc(r.label)}</td>
-      <td><span class="tag poly">Polymarket</span><span class="side-name">${esc(r.pSide)}</span><br>
-          цена <b>${r.polyLeg.price.toFixed(3)}</b> <span class="sub">(с комиссией ${r.qPoly.toFixed(4)})</span><br>
-          купить ${copy(r.polyShares.toFixed(2), `<b>${r.polyShares.toFixed(1)}</b> акций`)} ≈ ${copy(r.polyUsd.toFixed(2), `<b>${usd(r.polyUsd)}</b>`)}${r.belowMin ? ` <span class="tag warn">мин. ${r.belowMin} акций</span>` : ''}
-          <div class="sub">${state.live && stream.books.has(r.polyLeg.token) ? 'стакан онлайн' : 'стакан на момент скана'}</div></td>
-      <td><span class="tag duel">Duel</span><span class="side-name">${esc(r.duelLeg.label)}</span><br>
-          кэф <b>${r.duelLeg.price}</b><br>
-          поставить ${copy(r.duelStake.toFixed(2), `<b>${usd(r.duelStake)}</b>`)}
-          <div class="sub">кэф получен ${ago(r.t.duelAt)} назад${isHot(r.t) && state.live ? ` · обновляю каждые ${S.duelHotSec} с` : ''}</div>${moveNote(r.move)}</td>
-      <td>${r.maxBank != null ? `до <b>${usd(r.maxBank)}</b><div class="sub">${r.maxShares.toFixed(0)} акций в стакане</div>${r.bankTooBig ? '<span class="tag warn">банк больше стакана</span>' : ''}` : '—'}
-          <div><button class="small calc-open" data-id="${esc(r.id)}">Калькулятор</button> <button class="small j-arb" data-id="${esc(r.id)}" title="Записать вилку с суммами для банка из настроек">В журнал</button></div></td>
-    </tr>`).join('') : `<tr><td colspan="6" class="empty">${rows.length ? 'Вилок нет. Ближайшие к вилке — во вкладке «Все сравнения».' : 'Нажмите «Сканировать» или включите реал-тайм.'}</td></tr>`;
+  $('#arbBody').innerHTML = arbs.length ? arbs.map(r => `<tr class="${rowCls(r.id, now)}" data-pick="${esc(r.id)}">
+      <td>${timeCell(r.id)}</td>
+      <td><span class="profit ${r.suspicious ? 'sus' : ''}">+${r.profitPct.toFixed(2)}%</span><div class="sub">${signedUsd(r.profitUsd)} с ${usd(S.bankroll)}</div>${r.suspicious ? '<span class="tag warn">проверь руками</span>' : ''}</td>
+      <td>${gameCell(r)}</td>
+      <td><div class="sub">${esc(r.label)}</div>
+        <div class="legline"><span class="chip poly">Polymarket</span><span class="side-name">${esc(r.pSide)}</span><span class="odd">${r.polyLeg.price.toFixed(3)}</span>
+          <span class="sub">купить ${copy(r.polyShares.toFixed(2), `${r.polyShares.toFixed(1)} акц.`)} ≈ ${copy(r.polyUsd.toFixed(2), usd(r.polyUsd))}</span>${r.belowMin ? `<span class="tag warn">мин. ${r.belowMin} акций</span>` : ''}</div>
+        <div class="legline"><span class="chip duel">Duel</span><span class="side-name">${esc(r.duelLeg.label)}</span><span class="odd">${r.duelLeg.price}</span>
+          <span class="sub">ставка ${copy(r.duelStake.toFixed(2), usd(r.duelStake))} · кэф ${ago(r.t.duelAt)} назад${isHot(r.t) && state.live ? ` · обновляю раз в ${S.duelHotSec} с` : ''}</span></div>${moveNote(r.move)}</td>
+      <td>${r.maxBank != null ? `<b>${usd(r.maxBank)}</b><div class="sub">${r.maxShares.toFixed(0)} акций</div>${r.bankTooBig ? '<span class="tag warn">банк больше стакана</span>' : ''}` : '—'}
+        <div class="sub">${state.live && stream.books.has(r.polyLeg.token) ? 'стакан онлайн' : 'стакан на момент скана'}</div></td>
+      <td>${acts(r, `<button class="calc-open" data-id="${esc(r.id)}" title="Калькулятор">▦</button><button class="j-arb" data-id="${esc(r.id)}" title="В журнал (суммы для банка из настроек)">＋</button>${hideBtn(r.id)}`)}</td>
+    </tr>`).join('') : emptyRow(6, rows.length ? (nHidden && arbsAll.length ? 'Все вилки скрыты.' : state.q ? 'Ничего не найдено.' : 'Вилок нет. Ближайшие к вилке — во вкладке «Сравнения».') : nothing);
 
   $('#valueBody').innerHTML = values.length ? values.map(v => {
     const d = v.duelLeg, f = v.fair, top = f.quote[v.i];
-    const mv = d.move ? `<span class="${d.move < 0 ? 'neg' : 'pos'}">${d.move > 0 ? '▲' : '▼'} с ${d.open}</span>` : '<span class="sub">не двигалась</span>';
-    return `<tr class="${now - state.seen.get(v.id) < 15000 ? 'fresh' : ''}">
-      <td><div class="profit">+${v.evPct.toFixed(1)}%</div><div class="sub">EV на дистанции</div></td>
-      <td>${gameCell(v)}${openBtns(v)}</td>
-      <td>${esc(v.label)}</td>
-      <td><span class="tag duel">Duel</span><span class="side-name">${esc(d.label)}</span><br>кэф <b>${d.price}</b> · линия ${mv}
-          <div class="sub">кэф получен ${ago(v.t.duelAt)} назад</div>${moveNote(v.move)}</td>
-      <td>${(v.p * 100).toFixed(1)}% → кэф <b>${v.fairOdds.toFixed(2)}</b>
-          <div class="sub">Polymarket ${esc(v.side)}: ${top.bid.toFixed(3)} / ${top.ask.toFixed(3)}, спред ${f.spread.toFixed(3)}</div></td>
-      <td>${copy(v.stake.toFixed(2), `<b>${usd(v.stake)}</b>`)}<div class="sub">${(S.kellyFraction * 100).toFixed(0)}% Келли от ${usd(S.valueBank)}</div>
-          <button class="small j-val" data-id="${esc(v.id)}">В журнал</button></td>
+    const mv = d.move ? `<span class="${d.move < 0 ? 'neg' : 'pos'}">${d.move > 0 ? '▲' : '▼'} с ${d.open}</span>` : 'не двигалась';
+    return `<tr class="${rowCls(v.id, now)}" data-pick="${esc(v.id)}">
+      <td>${timeCell(v.id)}</td>
+      <td><span class="profit">+${v.evPct.toFixed(1)}%</span><div class="sub">EV</div></td>
+      <td>${gameCell(v)}</td>
+      <td><div class="sub">${esc(v.label)}</div>
+        <div class="legline"><span class="chip duel">Duel</span><span class="side-name">${esc(d.label)}</span><span class="odd">${d.price}</span><span class="sub">линия ${mv} · кэф ${ago(v.t.duelAt)} назад</span></div>
+        <div class="legline"><span class="chip poly">Справедливо</span><span>${(v.p * 100).toFixed(1)}%</span><span class="odd">${v.fairOdds.toFixed(2)}</span><span class="sub">${esc(v.side)}: ${top.bid.toFixed(3)} / ${top.ask.toFixed(3)}, спред ${f.spread.toFixed(3)}</span></div>${moveNote(v.move)}</td>
+      <td>${copy(v.stake.toFixed(2), `<b>${usd(v.stake)}</b>`)}<div class="sub">${(S.kellyFraction * 100).toFixed(0)}% Келли от ${usd(S.valueBank)}</div></td>
+      <td>${acts(v, `<button class="j-val" data-id="${esc(v.id)}" title="В журнал">＋</button>${hideBtn(v.id)}`)}</td>
     </tr>`;
-  }).join('') : `<tr><td colspan="6" class="empty">${rows.length ? `Валуек от ${S.minEV}% нет.` : 'Нажмите «Сканировать» или включите реал-тайм.'}</td></tr>`;
+  }).join('') : emptyRow(6, rows.length ? (state.q ? 'Ничего не найдено.' : `Валуек от ${S.minEV}% нет.`) : nothing);
 
-  const all = [...rows].sort((a, b) => a.sum - b.sum);
+  const all = rows.filter(matchQ).sort((a, b) => a.sum - b.sum);
   $('#allBody').innerHTML = all.length ? all.map(r => `<tr class="${r.problems.length ? 'off' : ''}">
       <td class="${r.arb ? 'sum-good' : ''}">${r.sum.toFixed(4)}</td>
       <td>${gameCell(r)}</td>
-      <td>${esc(r.label)}</td>
-      <td>${esc(r.pSide)} <b>${r.polyLeg.price.toFixed(3)}</b></td>
-      <td>${esc(r.duelLeg.label)} <b>@${r.duelLeg.price}</b></td>
+      <td><div class="sub">${esc(r.label)}</div>
+        <div class="legline"><span class="chip poly">Polymarket</span>${esc(r.pSide)} <span class="odd">${r.polyLeg.price.toFixed(3)}</span></div>
+        <div class="legline"><span class="chip duel">Duel</span>${esc(r.duelLeg.label)} <span class="odd">${r.duelLeg.price}</span></div></td>
       <td class="sub">${esc(r.problems.join('; ') || (r.arb ? `вилка +${r.profitPct.toFixed(2)}%` : `маржа ${(r.sum * 100 - 100).toFixed(1)}%`))}${moveNote(r.move)}</td>
-      <td>${openBtns(r)}</td>
-    </tr>`).join('') : '<tr><td colspan="7" class="empty">Пока пусто.</td></tr>';
+      <td>${acts(r)}</td>
+    </tr>`).join('') : emptyRow(5, state.q && rows.length ? 'Ничего не найдено.' : 'Пока пусто.');
 
   const tracked = [...state.tracked.values()].sort((a, b) => a.poly.start - b.poly.start);
   $('#pairBody').innerHTML = tracked.length ? tracked.map(t => `<tr>
       <td>${when(t.poly.start)}</td><td><a href="${esc(t.poly.url)}" target="polymarket" rel="noopener">${esc(t.poly.title)}</a></td>
       <td>${t.duel ? `<a href="${esc(t.duel.url)}" target="duel" rel="noopener">${esc(t.duel.title)}</a>` : esc(t.duelTitle)}${t.perm[0] === 1 ? ' <span class="sub">(команды в обратном порядке)</span>' : ''}</td>
-      <td>${t.skipped ? '<span class="sub">вне лимита</span>' : t.duel ? `${new Set(t.rows.map(r => r.market.key)).size} · лучшая сумма ${t.best != null ? t.best.toFixed(3) : '—'}${isHot(t) ? ' <span class="tag good">близко</span>' : ''}` : `<span class="sub">${esc(t.duelSkip || 'ещё не загружено')}</span>`}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">—</td></tr>';
+      <td>${t.skipped ? '<span class="sub">вне лимита</span>' : t.duel ? `${new Set(t.rows.map(r => r.market.key)).size} · лучшая сумма ${t.best != null ? t.best.toFixed(3) : '—'}${isHot(t) ? ' <span class="tag good">близко</span>' : ''}` : `<span class="sub">${esc(t.duelSkip || 'ещё не загружено')}</span>`}</td></tr>`).join('') : emptyRow(4, '—');
   $('#doubtBody').innerHTML = state.doubt.length ? state.doubt.map(d => `<tr>
-      <td>${when(d.poly.start)}</td><td>${esc(d.poly.title)}</td><td>${esc(d.duel.title)} <span class="sub">${when(d.duel.start)}</span></td><td class="sub">${esc(d.why)}</td></tr>`).join('') : '<tr><td colspan="4" class="empty">—</td></tr>';
+      <td>${when(d.poly.start)}</td><td>${esc(d.poly.title)}</td><td>${esc(d.duel.title)} <span class="sub">${when(d.duel.start)}</span></td><td class="sub">${esc(d.why)}</td></tr>`).join('') : emptyRow(4, '—');
   $('#aloneBody').innerHTML = state.alone.length ? [...state.alone].sort((a, b) => a.start - b.start).map(g => `<tr>
-      <td>${when(g.start)}</td><td><a href="${esc(g.url)}" target="polymarket" rel="noopener">${esc(g.title)}</a></td></tr>`).join('') : '<tr><td colspan="2" class="empty">—</td></tr>';
+      <td>${when(g.start)}</td><td><a href="${esc(g.url)}" target="polymarket" rel="noopener">${esc(g.title)}</a></td></tr>`).join('') : emptyRow(2, '—');
   renderCalc();
+  renderCoupon();
   renderCredits();
+  notify(arbsAll, valuesAll);
   if (state.journalDirty) { state.journalDirty = false; saveJournal(state.journal); }
   renderJournal();
+}
+
+/* --------------------------------- coupon --------------------------------- */
+// The picked arb / value bet: both legs, the Polymarket order book of our side, and amounts.
+function findPick(id) {
+  const r = findRow(id);
+  if (r) return { kind: 'arb', r };
+  const v = allValues().find(x => x.id === id);
+  return v ? { kind: 'value', r: v } : null;
+}
+function bookOf(token) {
+  const b = stream.books.get(token);
+  if (b) return { asks: b.askLevels(), bids: b.bidLevels(), live: true };
+  const rb = state.restBooks.get(token);
+  if (!rb) return null;
+  return Array.isArray(rb) ? { asks: rb, bids: [], live: false } : { asks: rb.asks || [], bids: rb.bids || [], live: false };
+}
+const COUPON_EMPTY = '<p class="sub">Нажмите на строку вилки или валуйки — здесь появятся обе ставки и стакан Polymarket.</p>';
+function selectPick(id) {
+  state.selId = state.selId === id && innerWidth > 760 ? null : id;
+  $('#coupon').classList.toggle('open', !!state.selId);
+  render();
+}
+function renderCoupon() {
+  const box = $('#couponBody');
+  if (!state.selId) { if (state.cpFor) { state.cpFor = null; box.innerHTML = COUPON_EMPTY; } return; }
+  const pick = findPick(state.selId);
+  if (!pick) { const s = $('#cpState'); if (s) s.innerHTML = '<span class="tag warn">пропала из сканера — цены на момент последнего обновления</span>'; return; }
+  const { kind, r } = pick;
+  if (state.cpFor !== state.selId) {
+    state.cpFor = state.selId; state.cpEdited = false;
+    const jBtn = kind === 'arb' ? `<button class="accent" id="cpJournal">В журнал</button>` : `<button class="accent wide" id="cpJournal">В журнал</button>`;
+    box.innerHTML = `
+      <div class="sub">${esc([r.t?.sp?.label, tournament(r)].filter(Boolean).join(' · '))} · ${when(r.poly.start)}</div>
+      <div class="cp-title">${esc(r.poly.title)}</div>
+      <div class="sub">${kind === 'arb' ? 'Вилка' : 'Валуйка'} · ${esc(r.label)}</div>
+      <div id="cpState"></div>
+      <div id="cpLegs" class="cp-legs"></div>
+      <div id="cpBookHead" class="sub"></div>
+      <table class="ladder"><thead><tr><th>Цена</th><th>КФ</th><th>$</th></tr></thead><tbody id="cpLadder"></tbody></table>
+      <div class="cp-in">${kind === 'arb'
+        ? '<label>Цена Polymarket<input id="kPrice" type="number" step="0.001" min="0" max="1"></label><label>Сумма на Polymarket, $<input id="kUsd" type="number" min="1" step="1"></label>'
+        : '<label>Кэф Duel<input id="kOdds" type="number" step="0.01" min="1"></label><label>Ставка, $<input id="kUsd" type="number" min="1" step="1"></label>'}</div>
+      <div id="cpOut" class="cp-out"></div>
+      <div class="cp-go"><a class="btn-pm" href="${esc(r.poly.url)}" target="polymarket" rel="noopener">Polymarket ↗</a><a class="btn-duel" href="${esc(r.duel.url)}" target="duel" rel="noopener">Duel ↗</a>
+        ${kind === 'arb' ? `<button class="calc-open" data-id="${esc(r.id)}">▦ Калькулятор</button>` : ''}${jBtn}</div>`;
+  }
+  $('#cpState').innerHTML = kind === 'arb' && !r.arb ? '<span class="tag warn">сейчас не вилка</span>' : kind === 'value' && !r.value ? '<span class="tag warn">сейчас не валуйка</span>' : '';
+  if (!state.cpEdited) {
+    if (kind === 'arb') { $('#kPrice').value = r.polyLeg.price; $('#kUsd').value = Math.round(r.polyUsd); }
+    else { $('#kOdds').value = r.duelLeg.price; $('#kUsd').value = Math.max(1, Math.round(r.stake)); }
+  }
+  const token = kind === 'arb' ? r.polyLeg.token : r.market.outs[r.i].token;
+  const polySide = kind === 'arb' ? r.pSide : r.side;
+  $('#cpLegs').innerHTML = kind === 'arb'
+    ? `<div class="cp-leg"><span class="chip poly">Polymarket</span> <span class="side-name">${esc(r.pSide)}</span><span class="odd">${r.polyLeg.price.toFixed(3)}</span><div class="sub">кф с комиссией ${(1 / r.qPoly).toFixed(3)}</div></div>
+       <div class="cp-leg"><span class="chip duel">Duel</span> <span class="side-name">${esc(r.duelLeg.label)}</span><span class="odd">${r.duelLeg.price}</span><div class="sub">кэф получен ${ago(r.t.duelAt)} назад</div></div>`
+    : `<div class="cp-leg"><span class="chip duel">Duel</span> <span class="side-name">${esc(r.duelLeg.label)}</span><span class="odd">${r.duelLeg.price}</span><div class="sub">EV +${r.evPct.toFixed(1)}% · кэф получен ${ago(r.t.duelAt)} назад</div></div>
+       <div class="cp-leg"><span class="chip poly">Справедливо</span> <span class="side-name">${esc(r.side)}</span><span class="odd">${r.fairOdds.toFixed(2)}</span><div class="sub">вероятность ${(r.p * 100).toFixed(1)}% по середине стакана</div></div>`;
+  const book = bookOf(token);
+  $('#cpBookHead').innerHTML = `Стакан Polymarket · ${esc(polySide)} · ${book?.live ? '<span class="pos">онлайн</span>' : 'на момент скана'}`;
+  if (book && (book.asks.length || book.bids.length)) {
+    const asks = book.asks.slice(0, 6).reverse(), bids = book.bids.slice(0, 6);
+    const max = Math.max(...[...asks, ...bids].map(l => l.price * l.size), 1);
+    const line = (l, cls) => `<tr class="${cls}" style="--w:${(l.price * l.size / max * 100).toFixed(0)}%"><td>${l.price.toFixed(3)}</td><td>${(1 / l.price).toFixed(2)}</td><td>${(l.price * l.size).toFixed(0)}</td></tr>`;
+    const a0 = book.asks[0]?.price, b0 = book.bids[0]?.price;
+    $('#cpLadder').innerHTML = asks.map(l => line(l, 'ask')).join('')
+      + `<tr class="mid"><td colspan="3">${a0 != null && b0 != null ? `спред ${(a0 - b0).toFixed(3)} · середина ${((a0 + b0) / 2).toFixed(3)}` : 'ASK сверху · BID снизу'}</td></tr>`
+      + bids.map(l => line(l, 'bid')).join('');
+  } else $('#cpLadder').innerHTML = '<tr class="mid"><td colspan="3">Стакан ещё не загружен</td></tr>';
+  fillCouponOut(kind, r);
+}
+function fillCouponOut(kind, r) {
+  const out = $('#cpOut');
+  if (kind === 'arb') {
+    const res = state.cpRes = calcArb({ price: +$('#kPrice').value, fee: r.polyLeg.fee, extraPct: S.extraPolyPct, odds: r.duelLeg.price, mode: 'poly', amount: +$('#kUsd').value });
+    out.innerHTML = res ? `<span>Контрактов</span><span>${copy(res.shares.toFixed(2), `<b>${res.shares.toFixed(2)}</b>`)}</span>
+      <span>Ставка Duel</span><span>${copy(res.duelStake.toFixed(2), `<b>${usd(res.duelStake)}</b>`)} @${r.duelLeg.price}</span>
+      <span>Комиссия Polymarket</span><span>${usd(res.feeUsd)}</span>
+      <span>Итого</span><span><b>${usd(res.total)}</b></span>
+      <span>Профит</span><span class="${res.worst >= 0 ? 'pos' : 'neg'}"><b>${signedUsd(res.worst)} (${res.worstPct.toFixed(2)}%)</b></span>` : '<span>Проверьте цену (0–1) и сумму</span><span></span>';
+  } else {
+    const odds = +$('#kOdds').value, stake = +$('#kUsd').value;
+    state.cpRes = odds > 1 && stake > 0 ? { odds, stake } : null;
+    out.innerHTML = state.cpRes ? `<span>Выигрыш при заходе</span><span class="pos"><b>+${usd(stake * (odds - 1))}</b></span>
+      <span>EV на дистанции</span><span class="${r.p * odds - 1 >= 0 ? 'pos' : 'neg'}"><b>${signedUsd(stake * (r.p * odds - 1))}</b> (${((r.p * odds - 1) * 100).toFixed(1)}%)</span>
+      <span>Келли</span><span>${usd(r.stake)}</span>` : '<span>Проверьте кэф и ставку</span><span></span>';
+  }
 }
 
 /* ------------------------------- calculator ------------------------------- */
@@ -409,34 +524,66 @@ function findRow(id) { return allRows().find(r => r.id === id); }
 function openCalc(id) {
   const r = findRow(id); if (!r) return;
   state.calcId = id; state.calcEdited = false;
-  $('#calc').hidden = false;
+  $('#calc').hidden = false; $('#calcBtn').classList.add('on');
   $('#cMode').value = 'bank'; $('#cAmount').value = S.bankroll; $('#cRound').value = '0';
   $('#cPrice').value = r.polyLeg.price; $('#cOdds').value = r.duelLeg.price;
+  if (!$('#tab-arbs').classList.contains('hidden') || innerWidth <= 760) $('#calc').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   renderCalc();
 }
 function renderCalc() {
-  if (!state.calcId || $('#calc').hidden) return;
-  const r = findRow(state.calcId);
-  if (r && !state.calcEdited) { $('#cPrice').value = r.polyLeg.price; $('#cOdds').value = r.duelLeg.price; }
+  if ($('#calc').hidden) return;
+  const r = state.calcId && findRow(state.calcId);
   const base = r || state.calcLast;
-  if (!base) return;
+  $('#cEmpty').hidden = !!base; $('#cBody').hidden = !base;
+  if (!base) { $('#cTitle').textContent = ''; return; }
+  if (r && !state.calcEdited) { $('#cPrice').value = r.polyLeg.price; $('#cOdds').value = r.duelLeg.price; }
   state.calcLast = base;
   $('#cTitle').textContent = `${base.poly.title} — ${base.label}`;
-  $('#cSides').innerHTML = `<span class="tag poly">Polymarket</span>${esc(base.pSide)} &nbsp; <span class="tag duel">Duel</span>${esc(base.duelLeg.label)}${!r ? ' <span class="tag warn">матч пропал из сканера</span>' : !r.arb ? ' <span class="tag warn">сейчас не вилка</span>' : ''}`;
+  $('#cPolySide').textContent = base.pSide; $('#cDuelSide').textContent = base.duelLeg.label;
+  $('#cSides').innerHTML = !r ? '<span class="tag warn">матч пропал из сканера</span>' : !r.arb ? '<span class="tag warn">сейчас не вилка</span>' : '';
   $('#cGo').innerHTML = openBtns(base);
+  const odds = +$('#cOdds').value;
   const res = state.calcRes = calcArb({
-    price: +$('#cPrice').value, fee: base.polyLeg.fee, extraPct: S.extraPolyPct, odds: +$('#cOdds').value,
+    price: +$('#cPrice').value, fee: base.polyLeg.fee, extraPct: S.extraPolyPct, odds,
     mode: $('#cMode').value, amount: +$('#cAmount').value, roundDuel: +$('#cRound').value,
   });
-  $('#cOut').innerHTML = res ? `
-    <div class="calc-grid">
-      <div>Polymarket: купить</div><div>${copy(res.shares.toFixed(2), `<b>${res.shares.toFixed(2)}</b> акций`)} за ${copy(res.polyUsd.toFixed(2), `<b>${usd(res.polyUsd)}</b>`)} <span class="sub">(комиссия ${usd(res.feeUsd)})</span></div>
-      <div>Duel: поставить</div><div>${copy(res.duelStake.toFixed(2), `<b>${usd(res.duelStake)}</b>`)} по ${(+$('#cOdds').value).toFixed(2)}</div>
-      <div>Всего</div><div><b>${usd(res.total)}</b> · сумма вероятностей ${res.sum.toFixed(4)}</div>
-      <div>Если выиграет Polymarket</div><div class="${res.winPoly >= 0 ? 'pos' : 'neg'}">${res.winPoly >= 0 ? '+' : ''}${usd(res.winPoly)}</div>
-      <div>Если выиграет Duel</div><div class="${res.winDuel >= 0 ? 'pos' : 'neg'}">${res.winDuel >= 0 ? '+' : ''}${usd(res.winDuel)}</div>
-      <div>Гарантированно</div><div class="${res.worst >= 0 ? 'pos' : 'neg'}"><b>${res.worst >= 0 ? '+' : ''}${usd(res.worst)} (${res.worstPct.toFixed(2)}%)</b></div>
-    </div>` : '<p class="sub">Проверьте цену (0–1) и кэф (> 1).</p>';
+  const win = x => `если зайдёт: <b class="${x >= 0 ? 'pos' : 'neg'}">${signedUsd(x)}</b>`;
+  $('#cPolyOut').innerHTML = res ? `купить ${copy(res.shares.toFixed(2), `<b>${res.shares.toFixed(2)}</b> акций`)} за ${copy(res.polyUsd.toFixed(2), `<b>${usd(res.polyUsd)}</b>`)} <span class="sub">(комиссия ${usd(res.feeUsd)})</span> · ${win(res.winPoly)}` : '';
+  $('#cDuelOut').innerHTML = res ? `поставить ${copy(res.duelStake.toFixed(2), `<b>${usd(res.duelStake)}</b>`)} по ${odds.toFixed(2)} · ${win(res.winDuel)}` : '';
+  $('#cOut').innerHTML = res ? `Итого <b>${usd(res.total)}</b> · Профит <b class="${res.worst >= 0 ? 'pos' : 'neg'}">${signedUsd(res.worst)} (${res.worstPct.toFixed(2)}%)</b>` : '<span class="neg">Проверьте цену (0–1) и кэф (&gt; 1)</span>';
+}
+
+/* -------------------------------- Telegram -------------------------------- */
+const alerted = loadAlerted();
+const tgQueue = [];
+let tgBusy = false;
+/** Send new arbs / value bets (from render) — each once, again only when it got better or an hour passed. */
+function notify(arbs, values) {
+  if (!S.tgToken || !S.tgChat) return;
+  const now = Date.now();
+  if (S.tgArbs) for (const r of arbs) {
+    if (r.profitPct < S.tgMinProfit || !shouldAlert(alerted, r.id, r.profitPct, now)) continue;
+    markAlerted(alerted, r.id, r.profitPct, now);
+    tgQueue.push([arbMessage({ ...r, risk: r.t?.sp?.risk }, { bankroll: S.bankroll, sportLabel: r.t?.sp?.label }), linkButtons(r.poly.url, r.duel.url)]);
+  }
+  if (S.tgValues) for (const v of values) {
+    if (v.evPct < S.tgMinEV || !shouldAlert(alerted, v.id, v.evPct, now, { stepPct: 2 })) continue;
+    markAlerted(alerted, v.id, v.evPct, now);
+    tgQueue.push([valueMessage({ ...v, risk: v.t?.sp?.risk }, { valueBank: S.valueBank, kellyFraction: S.kellyFraction, sportLabel: v.t?.sp?.label }), linkButtons(v.poly.url, v.duel.url)]);
+  }
+  if (tgQueue.length) { saveAlerted(alerted, now); drainTelegram(); }
+}
+async function drainTelegram() {
+  if (tgBusy) return;
+  tgBusy = true;
+  try {
+    while (tgQueue.length) {
+      const [text, buttons] = tgQueue.shift();
+      try { await sendTelegram(S.tgToken, S.tgChat, text, buttons); }
+      catch (e) { log(e.message, 'error'); if (/unauthorized|not found|chat not found/i.test(e.message)) { tgQueue.length = 0; break; } }
+      await new Promise(r => setTimeout(r, 1100)); // stay far below Telegram's limits
+    }
+  } finally { tgBusy = false; }
 }
 
 /* --------------------------------- journal -------------------------------- */
@@ -500,6 +647,10 @@ $$('.tab').forEach(b => b.addEventListener('click', () => {
 document.addEventListener('change', e => { if (e.target.closest('.side')) { readForm(); state.tracked.forEach(recompute); render(); } });
 document.addEventListener('click', e => {
   const c = e.target.closest('[data-copy]');
+  const pk = e.target.closest('tr[data-pick]');
+  if (pk && !e.target.closest('a, button, select, input, .copy')) selectPick(pk.dataset.pick);
+  const hr = e.target.closest('.hide-row');
+  if (hr) { state.hidden.add(hr.dataset.id); saveHidden(); if (state.selId === hr.dataset.id) { state.selId = null; $('#coupon').classList.remove('open'); } render(); }
   if (c) { navigator.clipboard?.writeText(c.dataset.copy); c.classList.add('copied'); setTimeout(() => c.classList.remove('copied'), 800); }
   const o = e.target.closest('.calc-open');
   if (o) openCalc(o.dataset.id);
@@ -521,6 +672,36 @@ document.addEventListener('change', e => {
   entry.result = s.value || null; entry.manual = !!s.value;
   saveJournal(state.journal); renderJournal();
 });
+$('#couponBody').addEventListener('input', e => {
+  if (!e.target.matches('input')) return;
+  const pick = state.selId && findPick(state.selId);
+  if (pick) { state.cpEdited = true; fillCouponOut(pick.kind, pick.r); }
+});
+$('#couponBody').addEventListener('click', e => {
+  if (!e.target.closest('#cpJournal')) return;
+  const pick = state.selId && findPick(state.selId), res = state.cpRes;
+  if (!pick) return;
+  if (pick.kind === 'arb') journalAdd(res ? arbEntry(pick.r, { shares: res.shares, polyUsd: res.polyUsd, duelStake: res.duelStake, price: +$('#kPrice').value }) : arbEntry(pick.r));
+  else journalAdd(res ? valueEntry(pick.r, { stake: res.stake, odds: res.odds }) : valueEntry(pick.r));
+});
+$('#couponClose').addEventListener('click', () => { state.selId = null; $('#coupon').classList.remove('open'); render(); });
+$('#calcBtn').addEventListener('click', () => {
+  const open = $('#calc').hidden;
+  $('#calc').hidden = !open; $('#calcBtn').classList.toggle('on', open);
+  renderCalc();
+});
+$$('#sortBy button').forEach(b => b.addEventListener('click', () => {
+  state.sort = b.dataset.sort;
+  $$('#sortBy button').forEach(x => x.classList.toggle('on', x === b));
+  render();
+}));
+$('#search').addEventListener('input', e => { state.q = e.target.value.trim().toLowerCase(); render(); });
+$('#hiddenBtn').addEventListener('click', () => { state.hidden.clear(); saveHidden(); render(); });
+$('#themeBtn').addEventListener('click', () => {
+  const t = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = t;
+  try { localStorage.setItem('duelpoly.theme', t); } catch {}
+});
 $('#cJournal').addEventListener('click', () => {
   const base = state.calcLast, res = state.calcRes;
   if (!base || !res) return;
@@ -533,8 +714,31 @@ $('#jCsv').addEventListener('click', () => {
   a.download = `journal-${new Date().toISOString().slice(0, 10)}.csv`; a.click();
 });
 $('#scanBtn').addEventListener('click', fullScan);
+$('#tgTest').addEventListener('click', async () => {
+  readForm();
+  if (!S.tgToken || !S.tgChat) return log('Telegram: вставьте токен бота и chat id', 'warn');
+  try {
+    const ok = await sendTelegram(S.tgToken, S.tgChat, '✅ Сканер Duel ↔ Polymarket подключён. Сюда будут приходить новые вилки.');
+    log(ok ? 'Telegram: тестовое сообщение отправлено' : 'Telegram: отправлено (ответ браузер не показывает — проверьте чат)', 'ok');
+  } catch (e) { log(e.message, 'error'); }
+});
+$('#tgFind').addEventListener('click', async () => {
+  readForm();
+  if (!S.tgToken) return log('Telegram: сначала вставьте токен бота', 'warn');
+  try {
+    const id = await findChatId(S.tgToken);
+    if (!id) return log('Telegram: напишите боту любое сообщение и нажмите ещё раз', 'warn');
+    $('#tgChat').value = id; readForm(); log(`Telegram: chat id ${id} сохранён`, 'ok');
+  } catch (e) { log(e.message + ' — впишите chat id вручную (например, через @userinfobot)', 'error'); }
+});
+// settings slide in from the right
+const toggleSide = open => { $('.side').classList.toggle('open', open); $('#shade').hidden = !open; };
+$('#sideBtn').addEventListener('click', () => toggleSide(!$('.side').classList.contains('open')));
+$('#sideClose').addEventListener('click', () => toggleSide(false));
+$('#shade').addEventListener('click', () => toggleSide(false));
+document.addEventListener('keydown', e => { if (e.key === 'Escape') toggleSide(false); });
 $('#liveBtn').addEventListener('click', () => (state.live ? stopLive() : startLive()));
-$('#calcClose').addEventListener('click', () => { $('#calc').hidden = true; state.calcId = null; });
+$('#calcClose').addEventListener('click', () => { $('#calc').hidden = true; $('#calcBtn').classList.remove('on'); });
 ['#cPrice', '#cOdds'].forEach(s => $(s).addEventListener('input', () => { state.calcEdited = true; renderCalc(); }));
 ['#cMode', '#cAmount', '#cRound'].forEach(s => $(s).addEventListener('input', renderCalc));
 $('#cReset').addEventListener('click', () => { state.calcEdited = false; renderCalc(); });
